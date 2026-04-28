@@ -19,8 +19,11 @@ export function useNowPlaying({ radioIds, refreshMs = 15000 }: Props) {
   useEffect(() => {
     if (radioIds.length === 0) { setLoading(false); return; }
     let cancelled = false;
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/now-playing?radio_ids=${radioIds.join(",")}`;
     const fetchOnce = async () => {
+      const now = new Date();
+      const dow = now.getDay();
+      const sec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/now-playing?radio_ids=${radioIds.join(",")}&dow=${dow}&sec=${sec}`;
       try {
         const res = await fetch(url, {
           headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
