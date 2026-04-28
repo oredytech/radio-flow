@@ -8,6 +8,7 @@ import Auth from "./pages/Auth.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import RadioDetail from "./pages/RadioDetail.tsx";
 import Embed from "./pages/Embed.tsx";
+import PublicRadio from "./pages/PublicRadio.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/:id" element={<RadioDetail />} />
           <Route path="/embed/:slug" element={<Embed />} />
+          <Route path="/radio/:slug" element={<PublicRadio />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
