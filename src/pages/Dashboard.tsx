@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Radio, Plus, LogOut, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
-import { NowPlayingWidget, NowPlayingBadge } from "@/components/NowPlaying";
+import { useNowPlaying, NowPlayingBadge } from "@/components/NowPlaying";
 
 type RadioRow = Tables<"radios">;
 
@@ -37,7 +37,7 @@ const Dashboard = () => {
   }, [user]);
 
   const radioIds = useMemo(() => radios.map((r) => r.id), [radios]);
-  const { items: nowPlaying, loading: nowLoading } = NowPlayingWidget({ radioIds });
+  const { items: nowPlaying, loading: nowLoading } = useNowPlaying({ radioIds });
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();

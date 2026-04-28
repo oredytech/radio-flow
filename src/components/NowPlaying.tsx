@@ -12,7 +12,7 @@ interface Props {
   refreshMs?: number;
 }
 
-export function NowPlayingWidget({ radioIds, refreshMs = 15000 }: Props) {
+export function useNowPlaying({ radioIds, refreshMs = 15000 }: Props) {
   const [items, setItems] = useState<Record<string, NowPlayingItem["active"]>>({});
   const [loading, setLoading] = useState(true);
 
