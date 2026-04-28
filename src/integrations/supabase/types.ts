@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      programs: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          radio_id: string
+          start_time: string
+          stream_url: string | null
+          title: string | null
+          type: Database["public"]["Enums"]["program_type"]
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          radio_id: string
+          start_time: string
+          stream_url?: string | null
+          title?: string | null
+          type: Database["public"]["Enums"]["program_type"]
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          radio_id?: string
+          start_time?: string
+          stream_url?: string | null
+          title?: string | null
+          type?: Database["public"]["Enums"]["program_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programs_radio_id_fkey"
+            columns: ["radio_id"]
+            isOneToOne: false
+            referencedRelation: "radios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      radios: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +114,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      program_type: "playlist" | "live"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +241,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      program_type: ["playlist", "live"],
+    },
   },
 } as const
