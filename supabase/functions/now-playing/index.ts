@@ -25,10 +25,7 @@ function timeToSec(t: string): number {
   return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
 }
 
-function resolveActive(progs: Program[], nowMs: number) {
-  const d = new Date(nowMs);
-  const dow = d.getUTCDay();
-  const sec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+function resolveActive(progs: Program[], dow: number, sec: number) {
   const todays = progs.filter((p) => p.day_of_week === dow);
   let live: Program | null = null;
   let playlist: Program | null = null;
@@ -52,6 +49,15 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const slug = url.searchParams.get("slug");
     const radioIdsParam = url.searchParams.get("radio_ids");
+    // Optional client-supplied wall clock (so the schedule resolves in the listener's tz).
+    // Falls back to server UTC when absent.
+    const dowParam = url.searchParams.get("dow");
+    const secParam = url.searchParams.get("sec");
+    const now = new Date();
+    const dow = dowParam !== null ? Math.max(0, Math.min(6, parseInt(dowParam, 10) || 0)) : now.getUTCDay();
+    const sec = secParam !== null
+      ? Math.max(0, Math.min(86399, parseInt(secParam, 10) || 0))
+      : now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
