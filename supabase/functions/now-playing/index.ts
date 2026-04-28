@@ -110,10 +110,9 @@ Deno.serve(async (req) => {
     );
     const programs: Program[] = await r.json();
 
-    const now = Date.now();
     const items = radioIds.map((rid) => {
       const progs = programs.filter((p) => p.radio_id === rid);
-      const active = resolveActive(progs, now);
+      const active = resolveActive(progs, dow, sec);
       return {
         radio_id: rid,
         radio: radioMeta[rid] ?? null,
@@ -130,7 +129,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ server_timestamp: now, items }),
+      JSON.stringify({ server_timestamp: Date.now(), resolved_at: { dow, sec }, items }),
       { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } },
     );
   } catch (e) {
