@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Radio, Plus, LogOut, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
+import { useNowPlaying, NowPlayingBadge } from "@/components/NowPlaying";
 
 type RadioRow = Tables<"radios">;
 
@@ -35,6 +36,9 @@ const Dashboard = () => {
       .then(({ data }) => setRadios(data ?? []));
   }, [user]);
 
+  const radioIds = useMemo(() => radios.map((r) => r.id), [radios]);
+  const { items: nowPlaying, loading: nowLoading } = useNowPlaying({ radioIds });
+
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -45,7 +49,7 @@ const Dashboard = () => {
       .select().single();
     setCreating(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Radio created");
+    toast.success("Radio créée");
     setRadios((r) => [data, ...r]);
     setOpen(false);
     setName(""); setSlug("");
@@ -76,30 +80,30 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Your stations</h1>
-            <p className="text-sm text-muted-foreground">Schedule programs, go live, embed anywhere.</p>
+            <h1 className="text-3xl font-bold">Mes stations</h1>
+            <p className="text-sm text-muted-foreground">Programmez, passez en direct, intégrez partout.</p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-brand text-primary-foreground shadow-glow">
-                <Plus className="mr-2 h-4 w-4" /> New station
+                <Plus className="mr-2 h-4 w-4" /> Nouvelle station
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Create a station</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Créer une station</DialogTitle></DialogHeader>
               <form onSubmit={create} className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">Nom</Label>
                   <Input id="name" required value={name}
                     onChange={(e) => { setName(e.target.value); if (!slug) setSlug(slugify(e.target.value)); }} />
                 </div>
                 <div>
-                  <Label htmlFor="slug">Slug (URL identifier)</Label>
+                  <Label htmlFor="slug">Slug (identifiant URL)</Label>
                   <Input id="slug" required value={slug} onChange={(e) => setSlug(slugify(e.target.value))} />
-                  <p className="mt-1 text-xs text-muted-foreground">/embed/{slug || "your-slug"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">/radio/{slug || "votre-slug"}</p>
                 </div>
                 <Button type="submit" disabled={creating} className="w-full bg-gradient-brand text-primary-foreground">
-                  {creating ? "Creating…" : "Create"}
+                  {creating ? "Création…" : "Créer"}
                 </Button>
               </form>
             </DialogContent>
@@ -109,23 +113,35 @@ const Dashboard = () => {
         {radios.length === 0 ? (
           <div className="mt-12 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
             <Radio className="mx-auto h-10 w-10 text-muted-foreground" />
-            <p className="mt-3 text-muted-foreground">No stations yet. Create your first one.</p>
+            <p className="mt-3 text-muted-foreground">Aucune station pour l'instant. Créez la première.</p>
           </div>
         ) : (
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {radios.map((r) => (
-              <Link key={r.id} to={`/dashboard/${r.id}`}
-                className="group rounded-xl border border-border bg-gradient-card p-5 shadow-elevated transition hover:border-primary/60 hover:shadow-glow">
-                <div className="flex items-start justify-between">
-                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-secondary">
-                    <Radio className="h-5 w-5 text-primary" />
+            {radios.map((r) => {
+              const active = nowPlaying[r.id];
+              return (
+                <Link key={r.id} to={`/dashboard/${r.id}`}
+                  className="group rounded-xl border border-border bg-gradient-card p-5 shadow-elevated transition hover:border-primary/60 hover:shadow-glow">
+                  <div className="flex items-start justify-between">
+                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-secondary">
+                      <Radio className="h-5 w-5 text-primary" />
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
                   </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-                </div>
-                <div className="mt-4 text-lg font-semibold">{r.name}</div>
-                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{r.slug}</div>
-              </Link>
-            ))}
+                  <div className="mt-4 text-lg font-semibold">{r.name}</div>
+                  <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{r.slug}</div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <NowPlayingBadge active={active} loading={nowLoading} />
+                    {active && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {active.title || (active.type === "live" ? "Émission en direct" : "Lecture")}
+                        <span className="ml-1 opacity-70">· {active.start_time.slice(0,5)}–{active.end_time.slice(0,5)}</span>
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>

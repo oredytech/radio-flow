@@ -16,11 +16,11 @@ const Landing = () => {
         </Link>
         <nav className="flex items-center gap-3">
           {user ? (
-            <Button asChild variant="default"><Link to="/dashboard">Dashboard</Link></Button>
+            <Button asChild variant="default"><Link to="/dashboard">Tableau de bord</Link></Button>
           ) : (
             <>
-              <Button asChild variant="ghost"><Link to="/auth">Sign in</Link></Button>
-              <Button asChild><Link to="/auth?mode=signup">Start broadcasting</Link></Button>
+              <Button asChild variant="ghost"><Link to="/auth">Se connecter</Link></Button>
+              <Button asChild><Link to="/auth?mode=signup">Lancer ma radio</Link></Button>
             </>
           )}
         </nav>
@@ -30,31 +30,31 @@ const Landing = () => {
         <section className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--live-red))] live-pulse" />
-            Synchronized broadcast engine
+            Moteur de diffusion synchronisé
           </span>
           <h1 className="mt-6 text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
-            Run a real <span className="text-gradient-brand">radio station</span>,
-            not a playlist.
+            Une vraie <span className="text-gradient-brand">station de radio</span>,
+            pas une playlist.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Schedule programs, swap to live streams instantly, and embed your station anywhere.
-            Every listener hears the same thing at the same time — synced to server time, drift-corrected continuously.
+            Programmez vos émissions, basculez en direct instantanément, et intégrez votre radio partout.
+            Tous les auditeurs entendent la même chose au même moment — synchronisés au temps serveur, avec correction de dérive en continu.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90">
-              <Link to={user ? "/dashboard" : "/auth?mode=signup"}>Launch your station</Link>
+              <Link to={user ? "/dashboard" : "/auth?mode=signup"}>Lancer ma station</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/auth">Sign in</Link>
+              <Link to="/auth">Se connecter</Link>
             </Button>
           </div>
         </section>
 
         <section className="mx-auto mt-24 grid max-w-5xl gap-4 sm:grid-cols-3">
           {[
-            { icon: Clock, title: "Server-time sync", body: "All clients align to a single broadcast clock with sub-second drift correction." },
-            { icon: Zap, title: "Live override", body: "Go live with a stream URL — playlists fade out, the LIVE indicator lights up." },
-            { icon: Globe, title: "Embed anywhere", body: "Drop one iframe on any site. Theme it, autoplay it, make it minimal." },
+            { icon: Clock, title: "Sync au temps serveur", body: "Tous les clients alignés sur une horloge unique, avec correction de dérive sub-seconde." },
+            { icon: Zap, title: "Bascule en direct", body: "Passez en live avec une URL de stream — la playlist s'efface, le voyant LIVE s'allume." },
+            { icon: Globe, title: "Intégration partout", body: "Une iframe à coller sur n'importe quel site. Thème, autoplay, mode minimal." },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-xl border border-border bg-gradient-card p-6 shadow-elevated">
               <Icon className="h-6 w-6 text-primary" />

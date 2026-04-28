@@ -33,7 +33,7 @@ export function RadioPlayer({
   if (state.error === "Radio not found") {
     return (
       <div className="flex h-full min-h-[120px] items-center justify-center bg-card text-muted-foreground">
-        Radio not found
+        Radio introuvable
       </div>
     );
   }
@@ -72,7 +72,7 @@ export function RadioPlayer({
         <div className="flex items-center gap-2">
           {isLive && userStarted && (
             <span className="live-pulse inline-flex items-center gap-1 rounded-full bg-[hsl(var(--live-red))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-              ● Live
+              ● En direct
             </span>
           )}
           {!isLive && userStarted && state.active && (
@@ -80,7 +80,7 @@ export function RadioPlayer({
               <span className="equalizer-bar" />
               <span className="equalizer-bar" />
               <span className="equalizer-bar" />
-              <span className="ml-1">On Air</span>
+              <span className="ml-1">À l'antenne</span>
             </span>
           )}
           {radioName && !minimal && (
@@ -90,7 +90,7 @@ export function RadioPlayer({
           )}
         </div>
         <div className="mt-1 truncate text-base font-semibold">
-          {state.active?.title || (state.active ? (isLive ? "Live broadcast" : "Now playing") : "Off air")}
+          {state.active?.title || (state.active ? (isLive ? "Émission en direct" : "Lecture en cours") : "Hors antenne")}
         </div>
         {!minimal && state.active && (
           <div className="mt-0.5 truncate text-xs text-muted-foreground">

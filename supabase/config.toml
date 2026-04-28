@@ -2,3 +2,6 @@ project_id = "lndmxlokhgkozkuhpnub"
 
 [functions.time]
 verify_jwt = false
+
+[functions.now-playing]
+verify_jwt = false
