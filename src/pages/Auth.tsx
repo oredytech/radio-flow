@@ -35,14 +35,14 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Account created! You're in.");
+        toast.success("Compte créé ! Vous êtes connecté.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success("Welcome back");
+        toast.success("Bon retour parmi nous");
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -57,15 +57,15 @@ const Auth = () => {
           </div>
           <span className="text-lg font-bold">Illusion<span className="text-gradient-brand">Radio</span></span>
         </Link>
-        <h1 className="text-2xl font-bold">{mode === "signup" ? "Start broadcasting" : "Welcome back"}</h1>
+        <h1 className="text-2xl font-bold">{mode === "signup" ? "Lancer ma radio" : "Bon retour"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signup" ? "Create your station in seconds." : "Sign in to manage your stations."}
+          {mode === "signup" ? "Créez votre station en quelques secondes." : "Connectez-vous pour gérer vos stations."}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           {mode === "signup" && (
             <div>
-              <Label htmlFor="display_name">Display name</Label>
+              <Label htmlFor="display_name">Nom d'affichage</Label>
               <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="DJ Nova" />
             </div>
           )}
@@ -74,11 +74,11 @@ const Auth = () => {
             <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Mot de passe</Label>
             <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <Button type="submit" disabled={loading} className="w-full bg-gradient-brand text-primary-foreground shadow-glow">
-            {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+            {loading ? "Veuillez patienter…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
           </Button>
         </form>
 
@@ -87,7 +87,7 @@ const Auth = () => {
           onClick={() => setMode((m) => (m === "signup" ? "signin" : "signup"))}
           className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground"
         >
-          {mode === "signup" ? "Already have an account? Sign in" : "New here? Create an account"}
+          {mode === "signup" ? "Déjà un compte ? Se connecter" : "Nouveau ? Créer un compte"}
         </button>
       </div>
     </div>
