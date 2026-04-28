@@ -71,4 +71,50 @@ export function resolveActiveProgram(programs: Program[], nowMs: number): Resolv
   return { active, offsetSec, msUntilChange };
 }
 
-export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+export const DAY_LABELS_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+
+/**
+ * Return overlapping program pairs in `programs` that share the same radio_id,
+ * day_of_week and type. Optionally exclude one id (the one being edited).
+ */
+export function findOverlaps(
+  programs: Pick<Program, "id" | "radio_id" | "day_of_week" | "type" | "start_time" | "end_time">[],
+  excludeId?: string,
+): Array<[typeof programs[number], typeof programs[number]]> {
+  const pairs: Array<[typeof programs[number], typeof programs[number]]> = [];
+  const list = excludeId ? programs.filter((p) => p.id !== excludeId) : programs;
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j];
+      if (a.radio_id !== b.radio_id) continue;
+      if (a.day_of_week !== b.day_of_week) continue;
+      if (a.type !== b.type) continue;
+      const aS = timeToSec(a.start_time), aE = timeToSec(a.end_time);
+      const bS = timeToSec(b.start_time), bE = timeToSec(b.end_time);
+      if (aS < bE && bS < aE) pairs.push([a, b]);
+    }
+  }
+  return pairs;
+}
+
+/**
+ * Check if a candidate program window overlaps any existing program for the same
+ * radio/day/type (excluding the candidate's own id when editing).
+ */
+export function overlapsExisting(
+  programs: Pick<Program, "id" | "radio_id" | "day_of_week" | "type" | "start_time" | "end_time">[],
+  candidate: { id?: string; radio_id: string; day_of_week: number; type: string; start_time: string; end_time: string },
+): boolean {
+  const cS = timeToSec(candidate.start_time);
+  const cE = timeToSec(candidate.end_time);
+  if (cE <= cS) return false; // invalid range, handled elsewhere
+  return programs.some((p) =>
+    p.id !== candidate.id &&
+    p.radio_id === candidate.radio_id &&
+    p.day_of_week === candidate.day_of_week &&
+    p.type === candidate.type &&
+    timeToSec(p.start_time) < cE &&
+    timeToSec(p.end_time) > cS,
+  );
+}
