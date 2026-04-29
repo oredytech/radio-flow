@@ -122,7 +122,7 @@ export function LibraryManager({ radioId, userId, tracks, onChange }: Props) {
         const path = `${userId}/${radioId}/${Date.now()}-${safeName}.${ext}`;
 
         const res = await uploadWithProgress(path, file, (pct) => updateUpload(item.id, { progress: pct }));
-        if (!res.ok) {
+        if (res.ok !== true) {
           const errMsg = res.error;
           updateUpload(item.id, { status: "error", error: errMsg });
           toast.error(`${file.name} : ${errMsg}`);
