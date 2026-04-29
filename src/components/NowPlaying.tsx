@@ -4,7 +4,7 @@ import { Radio as RadioIcon } from "lucide-react";
 
 interface NowPlayingItem {
   radio_id: string;
-  active: { id: string; type: "playlist" | "live"; title: string | null; start_time: string; end_time: string } | null;
+  active: { id: string; type: "playlist" | "live" | "jingle"; title: string | null; start_time: string; end_time: string } | null;
 }
 
 interface Props {
