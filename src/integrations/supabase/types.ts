@@ -106,6 +106,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tracks: {
+        Row: {
+          audio_url: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          kind: string
+          position: number
+          radio_id: string
+          title: string
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          kind?: string
+          position?: number
+          radio_id: string
+          title: string
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          kind?: string
+          position?: number
+          radio_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracks_radio_id_fkey"
+            columns: ["radio_id"]
+            isOneToOne: false
+            referencedRelation: "radios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -114,7 +155,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      program_type: "playlist" | "live"
+      program_type: "playlist" | "live" | "jingle"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -242,7 +283,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      program_type: ["playlist", "live"],
+      program_type: ["playlist", "live", "jingle"],
     },
   },
 } as const
