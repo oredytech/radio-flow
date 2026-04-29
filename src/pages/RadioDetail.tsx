@@ -475,7 +475,7 @@ const RadioDetail = () => {
                 />
               </label>
 
-              <pre className="overflow-x-auto rounded-md bg-background p-3 text-[11px] leading-relaxed text-foreground/80">
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 text-[10px] sm:text-[11px] leading-relaxed text-foreground/80">
 {embedSnippet}
               </pre>
               <Button variant="outline" size="sm" className="mt-2 w-full" onClick={copyEmbed}>
