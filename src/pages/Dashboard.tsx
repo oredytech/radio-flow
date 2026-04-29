@@ -63,7 +63,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container mx-auto flex items-center justify-between py-4">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <Link to="/" className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-brand shadow-glow">
               <Radio className="h-4 w-4 text-primary-foreground" />
