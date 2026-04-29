@@ -123,8 +123,9 @@ export function LibraryManager({ radioId, userId, tracks, onChange }: Props) {
 
         const res = await uploadWithProgress(path, file, (pct) => updateUpload(item.id, { progress: pct }));
         if (!res.ok) {
-          updateUpload(item.id, { status: "error", error: res.error });
-          toast.error(`${file.name} : ${res.error}`);
+          const errMsg = res.error;
+          updateUpload(item.id, { status: "error", error: errMsg });
+          toast.error(`${file.name} : ${errMsg}`);
           continue;
         }
 
