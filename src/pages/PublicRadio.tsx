@@ -104,8 +104,8 @@ const PublicRadio = () => {
             </Button>
           </div>
 
-          <div className="mt-10">
-            <h2 className="text-lg font-semibold">Grille de la semaine</h2>
+          <div className="mt-8 sm:mt-10">
+            <h2 className="text-base sm:text-lg font-semibold">Grille de la semaine</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {DAY_LABELS.map((d, i) => (
                 <div key={i} className="rounded-xl border border-border bg-gradient-card p-4">
