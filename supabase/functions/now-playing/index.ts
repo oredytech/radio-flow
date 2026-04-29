@@ -11,7 +11,7 @@ const corsHeaders = {
 interface Program {
   id: string;
   radio_id: string;
-  type: "playlist" | "live";
+  type: "playlist" | "live" | "jingle";
   title: string | null;
   day_of_week: number;
   start_time: string;
@@ -19,6 +19,8 @@ interface Program {
   audio_url: string | null;
   stream_url: string | null;
 }
+
+const JINGLE_MAX_SEC = 600;
 
 function timeToSec(t: string): number {
   const p = t.split(":").map(Number);
@@ -29,15 +31,18 @@ function resolveActive(progs: Program[], dow: number, sec: number) {
   const todays = progs.filter((p) => p.day_of_week === dow);
   let live: Program | null = null;
   let playlist: Program | null = null;
+  let jingle: Program | null = null;
   for (const p of todays) {
     const s = timeToSec(p.start_time);
     const e = timeToSec(p.end_time);
     if (sec >= s && sec < e) {
-      if (p.type === "live") live = p;
+      if (p.type === "jingle") {
+        if (sec - s < JINGLE_MAX_SEC) jingle = p;
+      } else if (p.type === "live") live = p;
       else playlist = p;
     }
   }
-  return live ?? playlist;
+  return jingle ?? live ?? playlist;
 }
 
 Deno.serve(async (req) => {

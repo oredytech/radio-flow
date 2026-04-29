@@ -63,7 +63,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container mx-auto flex items-center justify-between py-4">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <Link to="/" className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-brand shadow-glow">
               <Radio className="h-4 w-4 text-primary-foreground" />
@@ -77,10 +77,10 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-10">
-        <div className="flex items-center justify-between">
+      <main className="container mx-auto px-4 py-8 sm:py-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Mes stations</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">Mes stations</h1>
             <p className="text-sm text-muted-foreground">Programmez, passez en direct, intégrez partout.</p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>

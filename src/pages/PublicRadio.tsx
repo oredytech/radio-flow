@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioPlayer } from "@/components/RadioPlayer";
+import { Button } from "@/components/ui/button";
 import { DAY_LABELS } from "@/lib/schedule";
 import type { Tables } from "@/integrations/supabase/types";
-import { Radio as RadioIcon, ArrowLeft } from "lucide-react";
+import { Radio as RadioIcon, ArrowLeft, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 type RadioRow = Tables<"radios">;
 type Program = Tables<"programs">;
@@ -80,13 +82,26 @@ const PublicRadio = () => {
       <main className="container mx-auto px-4 py-10">
         <section className="mx-auto max-w-3xl">
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">En direct</div>
-          <h1 className="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">{radio.name}</h1>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">{radio.name}</h1>
           {radio.description && (
             <p className="mt-3 text-base text-muted-foreground">{radio.description}</p>
           )}
 
-          <div className="mt-8">
+          <div className="mt-6 sm:mt-8">
             <RadioPlayer slug={radio.slug} radioName={radio.name} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={async () => {
+              const url = window.location.href;
+              if (navigator.share) {
+                try { await navigator.share({ title: radio.name, url }); return; } catch { /* fallback */ }
+              }
+              await navigator.clipboard.writeText(url);
+              toast.success("Lien copié");
+            }}>
+              <Share2 className="mr-1.5 h-3.5 w-3.5" /> Partager cette radio
+            </Button>
           </div>
 
           <div className="mt-10">
@@ -100,12 +115,14 @@ const PublicRadio = () => {
                   ) : (
                     <ul className="space-y-1.5">
                       {grouped[i].map((p) => (
-                        <li key={p.id} className="flex items-center gap-2 text-sm">
+                        <li key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
                           <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                             p.type === "live"
                               ? "bg-[hsl(var(--live-red))] text-white"
-                              : "bg-secondary text-foreground"
-                          }`}>{p.type === "live" ? "Direct" : "Playlist"}</span>
+                              : p.type === "jingle"
+                                ? "bg-[hsl(var(--neon-magenta))]/25 text-[hsl(var(--neon-magenta))]"
+                                : "bg-secondary text-foreground"
+                          }`}>{p.type === "live" ? "Direct" : p.type === "jingle" ? "Jingle" : "Playlist"}</span>
                           <span className="font-mono text-xs text-muted-foreground">
                             {p.start_time.slice(0,5)}–{p.end_time.slice(0,5)}
                           </span>

@@ -4,7 +4,7 @@ import { Radio as RadioIcon } from "lucide-react";
 
 interface NowPlayingItem {
   radio_id: string;
-  active: { id: string; type: "playlist" | "live"; title: string | null; start_time: string; end_time: string } | null;
+  active: { id: string; type: "playlist" | "live" | "jingle"; title: string | null; start_time: string; end_time: string } | null;
 }
 
 interface Props {
@@ -67,6 +67,13 @@ export function NowPlayingBadge({ active, loading }: { active: NowPlayingItem["a
     return (
       <span className="live-pulse inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--live-red))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
         ● En direct
+      </span>
+    );
+  }
+  if (active.type === "jingle") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--neon-magenta))]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--neon-magenta))]">
+        Jingle
       </span>
     );
   }

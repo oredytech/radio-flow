@@ -29,6 +29,7 @@ export function RadioPlayer({
 
   const isLight = theme === "light";
   const isLive = state.active?.type === "live";
+  const isAutoDj = state.source === "autodj";
 
   if (state.error === "Radio not found") {
     return (
@@ -41,13 +42,12 @@ export function RadioPlayer({
   return (
     <div
       className={cn(
-        "relative flex h-full w-full items-center gap-4 overflow-hidden rounded-xl border p-4",
+        "relative flex h-full w-full items-center gap-3 overflow-hidden rounded-xl border p-3 sm:gap-4 sm:p-4",
         isLight
           ? "bg-white text-zinc-900 border-zinc-200"
           : "bg-gradient-card text-foreground border-border shadow-elevated",
       )}
     >
-      {/* Glow */}
       {!isLight && (
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
@@ -58,24 +58,24 @@ export function RadioPlayer({
       <button
         onClick={() => (userStarted ? stop() : start())}
         className={cn(
-          "relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95",
+          "relative z-10 flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95",
           isLive
             ? "bg-[hsl(var(--live-red))] text-white shadow-[0_0_30px_hsl(var(--live-red)/0.6)]"
             : "bg-gradient-brand text-primary-foreground shadow-glow",
         )}
         aria-label={userStarted ? "Stop" : "Play"}
       >
-        {userStarted ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
+        {userStarted ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 translate-x-0.5" />}
       </button>
 
       <div className="relative z-10 min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {isLive && userStarted && (
             <span className="live-pulse inline-flex items-center gap-1 rounded-full bg-[hsl(var(--live-red))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
               ● En direct
             </span>
           )}
-          {!isLive && userStarted && state.active && (
+          {!isLive && userStarted && state.source === "program" && (
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
               <span className="equalizer-bar" />
               <span className="equalizer-bar" />
@@ -83,22 +83,38 @@ export function RadioPlayer({
               <span className="ml-1">À l'antenne</span>
             </span>
           )}
+          {isAutoDj && userStarted && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--neon-violet))]/20 text-[hsl(var(--neon-violet))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+              <span className="equalizer-bar" />
+              <span className="equalizer-bar" />
+              <span className="ml-1">Auto DJ</span>
+            </span>
+          )}
           {radioName && !minimal && (
-            <span className="truncate text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="truncate text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground">
               {radioName}
             </span>
           )}
         </div>
-        <div className="mt-1 truncate text-base font-semibold">
-          {state.active?.title || (state.active ? (isLive ? "Émission en direct" : "Lecture en cours") : "Hors antenne")}
+        <div className="mt-1 truncate text-sm sm:text-base font-semibold">
+          {userStarted
+            ? (state.currentTitle || (state.source === "silence" ? "Hors antenne" : "Lecture en cours"))
+            : (state.active?.title || (state.active ? "Programme prêt" : (state.autoDj?.track ? `Auto DJ · ${state.autoDj.track.title}` : "Hors antenne")))}
         </div>
-        {!minimal && state.active && (
-          <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {secToHHMM(timeToSec(state.active.start_time))} – {secToHHMM(timeToSec(state.active.end_time))}
-            {!isLive && userStarted && (
-              <span className="ml-2 opacity-70">
-                offset {Math.floor(state.offsetSec / 60)}:{(Math.floor(state.offsetSec) % 60).toString().padStart(2, "0")}
-              </span>
+        {!minimal && (state.active || isAutoDj) && (
+          <div className="mt-0.5 truncate text-[11px] sm:text-xs text-muted-foreground">
+            {state.active && (
+              <>
+                {secToHHMM(timeToSec(state.active.start_time))} – {secToHHMM(timeToSec(state.active.end_time))}
+                {!isLive && userStarted && state.source === "program" && (
+                  <span className="ml-2 opacity-70">
+                    offset {Math.floor(state.offsetSec / 60)}:{(Math.floor(state.offsetSec) % 60).toString().padStart(2, "0")}
+                  </span>
+                )}
+              </>
+            )}
+            {!state.active && isAutoDj && state.autoDj?.track && (
+              <span>Rotation continue · piste {state.autoDj.index + 1}</span>
             )}
           </div>
         )}
