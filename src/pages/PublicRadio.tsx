@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioPlayer } from "@/components/RadioPlayer";
+import { Button } from "@/components/ui/button";
 import { DAY_LABELS } from "@/lib/schedule";
 import type { Tables } from "@/integrations/supabase/types";
-import { Radio as RadioIcon, ArrowLeft } from "lucide-react";
+import { Radio as RadioIcon, ArrowLeft, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 type RadioRow = Tables<"radios">;
 type Program = Tables<"programs">;
