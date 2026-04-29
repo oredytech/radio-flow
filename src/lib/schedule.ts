@@ -1,6 +1,7 @@
 import type { Tables } from "@/integrations/supabase/types";
 
 export type Program = Tables<"programs">;
+export type Track = Tables<"tracks">;
 
 // Parse "HH:MM:SS" or "HH:MM" → seconds since midnight
 export function timeToSec(t: string): number {
