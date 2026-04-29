@@ -69,20 +69,20 @@ const PublicRadio = () => {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container mx-auto flex items-center justify-between py-4">
+        <div className="container mx-auto flex items-center justify-between px-4 py-3 sm:py-4">
           <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Accueil
           </Link>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <RadioIcon className="h-3.5 w-3.5" /> /radio/{radio.slug}
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs text-muted-foreground truncate max-w-[60%]">
+            <RadioIcon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">/radio/{radio.slug}</span>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-10">
+      <main className="container mx-auto px-4 py-6 sm:py-10">
         <section className="mx-auto max-w-3xl">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">En direct</div>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">{radio.name}</h1>
+          <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground">En direct</div>
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl break-words">{radio.name}</h1>
           {radio.description && (
             <p className="mt-3 text-base text-muted-foreground">{radio.description}</p>
           )}
@@ -104,8 +104,8 @@ const PublicRadio = () => {
             </Button>
           </div>
 
-          <div className="mt-10">
-            <h2 className="text-lg font-semibold">Grille de la semaine</h2>
+          <div className="mt-8 sm:mt-10">
+            <h2 className="text-base sm:text-lg font-semibold">Grille de la semaine</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {DAY_LABELS.map((d, i) => (
                 <div key={i} className="rounded-xl border border-border bg-gradient-card p-4">

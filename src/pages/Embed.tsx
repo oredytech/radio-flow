@@ -23,7 +23,7 @@ const Embed = () => {
   }, [slug]);
 
   return (
-    <div className="h-screen w-screen p-2">
+    <div className="h-screen w-screen p-1 sm:p-2">
       <RadioPlayer slug={slug} radioName={name} theme={theme} minimal={minimal} autoplay={autoplay} />
     </div>
   );

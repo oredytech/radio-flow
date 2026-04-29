@@ -209,19 +209,19 @@ const RadioDetail = () => {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Retour
+        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3 sm:py-4">
+          <Link to="/dashboard" className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden xs:inline">Retour</span>
           </Link>
           <a href={publicUrl} target="_blank" rel="noreferrer"
-             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
-            <RadioIcon className="h-3.5 w-3.5" /> /radio/{radio.slug}
+             className="flex min-w-0 items-center gap-2 text-[11px] sm:text-xs text-muted-foreground hover:text-foreground">
+            <RadioIcon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">/radio/{radio.slug}</span>
           </a>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        <h1 className="text-2xl font-bold sm:text-3xl">{radio.name}</h1>
+      <main className="container mx-auto px-4 py-5 sm:py-8">
+        <h1 className="text-xl font-bold sm:text-3xl break-words">{radio.name}</h1>
 
         {conflictPairs.length > 0 && (
           <div className="mt-4 flex items-start gap-3 rounded-xl border border-[hsl(var(--live-red))]/40 bg-[hsl(var(--live-red))]/10 p-3 text-sm sm:p-4">
@@ -475,7 +475,7 @@ const RadioDetail = () => {
                 />
               </label>
 
-              <pre className="overflow-x-auto rounded-md bg-background p-3 text-[11px] leading-relaxed text-foreground/80">
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 text-[10px] sm:text-[11px] leading-relaxed text-foreground/80">
 {embedSnippet}
               </pre>
               <Button variant="outline" size="sm" className="mt-2 w-full" onClick={copyEmbed}>
