@@ -70,6 +70,13 @@ export function NowPlayingBadge({ active, loading }: { active: NowPlayingItem["a
       </span>
     );
   }
+  if (active.type === "jingle") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--neon-magenta))]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--neon-magenta))]">
+        Jingle
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
       <RadioIcon className="h-2.5 w-2.5" />
