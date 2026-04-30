@@ -115,6 +115,18 @@ const RadioDetail = () => {
     return form.audioUrl;
   }, [form.audioSource, form.audioTrackIds, form.audioUrl, tracks]);
 
+  const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
+  const schedulableTracks = useMemo(() => tracks
+    .filter((t) => {
+      const folder = t.folder_id ? folderById.get(t.folder_id) : null;
+      return !folder || folder.kind === "shows" || folder.kind === "jingles";
+    })
+    .sort((a, b) => (folderById.get(a.folder_id ?? "")?.position ?? 99) - (folderById.get(b.folder_id ?? "")?.position ?? 99) || a.position - b.position),
+  [tracks, folderById]);
+  const selectedTracks = useMemo(() => form.audioTrackIds
+    .map((trackId) => tracks.find((t) => t.id === trackId))
+    .filter(Boolean) as Track[], [form.audioTrackIds, tracks]);
+
   const formError = useMemo(() => {
     if (!radio) return null;
     if (form.slots.some((slot) => slot.end <= slot.start)) return "L'heure de fin doit être après le début.";
@@ -133,6 +145,20 @@ const RadioDetail = () => {
     }
     return null;
   }, [form, programs, radio]);
+
+  const refreshProgramTracks = async () => {
+    if (!radio) return;
+    const { data } = await supabase.from("program_tracks").select("*, track:tracks(*)").order("position");
+    setProgramTracks((data ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
+  };
+
+  const saveProgramTracks = async (programId: string) => {
+    await supabase.from("program_tracks").delete().eq("program_id", programId);
+    if (form.type === "live" || form.audioSource !== "library" || form.audioTrackIds.length === 0) return null;
+    return supabase.from("program_tracks").insert(
+      form.audioTrackIds.map((trackId, position) => ({ program_id: programId, track_id: trackId, position })),
+    );
+  };
 
   const openCreate = () => { setForm(emptyForm()); setOpen(true); };
   const openEdit = (p: Program) => {
