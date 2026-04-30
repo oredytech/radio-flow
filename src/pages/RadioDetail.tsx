@@ -429,6 +429,7 @@ const RadioDetail = () => {
                 {user && (
                   <LibraryManager
                     radioId={radio.id}
+                    radioSlug={radio.slug}
                     userId={user.id}
                     tracks={tracks}
                     onChange={setTracks}
