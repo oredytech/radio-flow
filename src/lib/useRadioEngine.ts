@@ -214,8 +214,8 @@ export function useRadioEngine(slug: string) {
       const liveAudio = liveRef.current!;
 
       const now = serverNow();
-      const resolved = resolveActiveProgram(programs, now, tracks, folders);
-      const { active, offsetSec, autoDj } = resolved;
+      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+      const { active, offsetSec, autoDj, scheduledAudio } = resolved;
 
       let driftCorrection = 0;
 
@@ -253,8 +253,13 @@ export function useRadioEngine(slug: string) {
 
       // ---- 2. Playlist or Jingle program (file-based) ---------------------
       if (active && (active.type === "playlist" || active.type === "jingle")) {
-        const key = `prog:${active.id}`;
-        const audioUrl = active.audio_url ?? "";
+        if (!scheduledAudio) {
+          currentKey.current = null;
+          setState((s) => ({ ...s, ...resolved, error: "Audio indisponible", source: "silence", currentTitle: null }));
+          return;
+        }
+        const key = scheduledAudio.key;
+        const audioUrl = scheduledAudio.audioUrl;
         const switched = currentKey.current !== key;
 
         if (!liveAudio.paused) {
@@ -266,22 +271,12 @@ export function useRadioEngine(slug: string) {
           try {
             playlistAudio.src = audioUrl;
             playlistAudio.volume = 0;
-            await new Promise<void>((res, rej) => {
-              const onLoaded = () => { cleanup(); res(); };
-              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-              const cleanup = () => {
-                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-                playlistAudio.removeEventListener("error", onErr);
-              };
-              playlistAudio.addEventListener("loadedmetadata", onLoaded);
-              playlistAudio.addEventListener("error", onErr);
-              playlistAudio.load();
-            });
+            await waitForAudioReady(playlistAudio);
             const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-              ? playlistAudio.duration : null;
+              ? playlistAudio.duration : scheduledAudio.durationSec;
             const target = active.type === "jingle"
-              ? Math.min(offsetSec, dur ?? offsetSec)
-              : (dur ? offsetSec % dur : offsetSec);
+              ? Math.min(scheduledAudio.offsetSec, dur ?? scheduledAudio.offsetSec)
+              : scheduledAudio.offsetSec;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
             await fade(playlistAudio, 1, FADE_MS);
@@ -294,8 +289,13 @@ export function useRadioEngine(slug: string) {
           }
         } else if (active.type === "playlist") {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-            ? playlistAudio.duration : null;
-          const target = dur ? offsetSec % dur : offsetSec;
+            ? playlistAudio.duration : scheduledAudio.durationSec;
+          if (nativeEnded(playlistAudio, dur)) {
+            currentKey.current = null;
+            window.setTimeout(() => tickFnRef.current?.().catch(() => {}), 0);
+            return;
+          }
+          const target = scheduledAudio.offsetSec;
           const diff = target - playlistAudio.currentTime;
           if (Math.abs(diff) > DRIFT_TOLERANCE_SEC) {
             playlistAudio.currentTime = Math.max(0, target);
@@ -310,7 +310,7 @@ export function useRadioEngine(slug: string) {
           error: null,
           driftCorrectionSec: driftCorrection,
           source: "program",
-          currentTitle: active.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
+          currentTitle: active.title || scheduledAudio.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
         });
         return;
       }
