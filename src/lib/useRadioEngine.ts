@@ -123,15 +123,17 @@ export function useRadioEngine(slug: string) {
         if (!cancelled) setState((s) => ({ ...s, error: "Radio not found" }));
         return;
       }
-      const [{ data: progs }, { data: trks }, { data: flds }] = await Promise.all([
+      const [{ data: progs }, { data: trks }, { data: flds }, { data: pts }] = await Promise.all([
         supabase.from("programs").select("*").eq("radio_id", radio.id),
         supabase.from("tracks").select("*").eq("radio_id", radio.id),
         supabase.from("track_folders").select("*").eq("radio_id", radio.id),
+        supabase.from("program_tracks").select("*, track:tracks(*)").order("position"),
       ]);
       if (!cancelled) {
         setPrograms(progs ?? []);
         setTracks(trks ?? []);
         setFolders(flds ?? []);
+        setProgramTracks((pts ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
         setState((s) => ({ ...s, isReady: true }));
       }
       const channel = supabase
@@ -156,6 +158,13 @@ export function useRadioEngine(slug: string) {
             const { data: f2 } = await supabase
               .from("track_folders").select("*").eq("radio_id", radio.id);
             if (!cancelled) setFolders(f2 ?? []);
+          })
+        .on("postgres_changes",
+          { event: "*", schema: "public", table: "program_tracks" },
+          async () => {
+            const { data: pt2 } = await supabase
+              .from("program_tracks").select("*, track:tracks(*)").order("position");
+            if (!cancelled) setProgramTracks((pt2 ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
           })
         .subscribe();
       cleanupFn = () => { supabase.removeChannel(channel); };
