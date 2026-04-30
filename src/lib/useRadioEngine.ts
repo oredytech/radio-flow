@@ -440,9 +440,9 @@ export function useRadioEngine(slug: string) {
   useEffect(() => {
     if (programs.length === 0 && tracks.length === 0) return;
     const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks, folders);
+    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
     setState((s) => ({ ...s, ...resolved }));
-  }, [programs, tracks, folders]);
+  }, [programs, tracks, folders, programTracks]);
 
   const start = useCallback(async () => {
     await syncServerTime();
