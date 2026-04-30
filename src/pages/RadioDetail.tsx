@@ -237,9 +237,9 @@ const RadioDetail = () => {
           </div>
         )}
 
-        {/* Live preview FIRST on mobile */}
+        {/* Live preview FIRST on mobile (owner sees AutoDJ details) */}
         <div className="mt-6 lg:hidden">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} />
+          <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource />
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,360px]">
@@ -429,6 +429,7 @@ const RadioDetail = () => {
                 {user && (
                   <LibraryManager
                     radioId={radio.id}
+                    radioSlug={radio.slug}
                     userId={user.id}
                     tracks={tracks}
                     onChange={setTracks}
@@ -442,7 +443,7 @@ const RadioDetail = () => {
             {/* Hide preview here on mobile (already shown above) */}
             <div className="hidden lg:block">
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Aperçu en direct</div>
-              <RadioPlayer slug={radio.slug} radioName={radio.name} />
+              <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource />
             </div>
 
             <div className="rounded-xl border border-border bg-gradient-card p-4">

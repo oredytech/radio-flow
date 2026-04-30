@@ -2,6 +2,7 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type Program = Tables<"programs">;
 export type Track = Tables<"tracks">;
+export type TrackFolder = Tables<"track_folders">;
 
 // Parse "HH:MM:SS" or "HH:MM" → seconds since midnight
 export function timeToSec(t: string): number {
@@ -44,6 +45,7 @@ export function resolveActiveProgram(
   programs: Program[],
   nowMs: number,
   tracks: Track[] = [],
+  folders: TrackFolder[] = [],
 ): ResolvedState {
   const local = new Date(nowMs);
   const localDow = local.getDay();
@@ -89,21 +91,25 @@ export function resolveActiveProgram(
     else msUntilChange = (24 * 3600 - localSec) * 1000;
   }
 
-  // Auto DJ — always computed (used when no scheduled program is active OR
-  // when a playlist program has no audio_url, defensively).
-  const autoDj = computeAutoDj(tracks, nowMs);
+  // Auto DJ — uses only the tracks from the folder marked is_autodj_source.
+  const autoDj = computeAutoDj(tracks, nowMs, folders);
 
   return { active, offsetSec, msUntilChange, autoDj };
 }
 
 /**
- * Deterministic Auto DJ: tracks ordered by `position`, looped end-to-end.
- * The position in the global rotation is derived from server time so that
- * every listener hears the exact same track at the same offset.
+ * Deterministic Auto DJ: tracks from the AutoDJ-source folder ordered by
+ * `position`, looped end-to-end. The position in the global rotation is
+ * derived from server time so that every listener hears the exact same
+ * track at the same offset.
  */
-export function computeAutoDj(tracks: Track[], nowMs: number) {
-  const music = tracks
-    .filter((t) => t.kind !== "jingle" && (t.duration_seconds ?? 0) > 0)
+export function computeAutoDj(tracks: Track[], nowMs: number, folders: TrackFolder[] = []) {
+  const sourceFolder = folders.find((f) => f.is_autodj_source);
+  const pool = sourceFolder
+    ? tracks.filter((t) => t.folder_id === sourceFolder.id)
+    : tracks; // legacy fallback if no folder configured yet
+  const music = pool
+    .filter((t) => (t.duration_seconds ?? 0) > 0)
     .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
   if (music.length === 0) return { track: null, offsetSec: 0, index: 0 };
 
