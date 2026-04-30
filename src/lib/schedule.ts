@@ -4,6 +4,15 @@ export type Program = Tables<"programs">;
 export type Track = Tables<"tracks">;
 export type TrackFolder = Tables<"track_folders">;
 
+export interface ProgramTrack {
+  id: string;
+  program_id: string;
+  track_id: string;
+  position: number;
+  created_at: string;
+  track?: Track | null;
+}
+
 // Parse "HH:MM:SS" or "HH:MM" → seconds since midnight
 export function timeToSec(t: string): number {
   const parts = t.split(":").map(Number);
@@ -31,6 +40,15 @@ export interface ResolvedState {
     // index of the track in the rotation (for diagnostics)
     index: number;
   } | null;
+  scheduledAudio: {
+    key: string;
+    audioUrl: string;
+    title: string;
+    offsetSec: number;
+    durationSec: number | null;
+    index: number;
+    track: Track | null;
+  } | null;
 }
 
 const JINGLE_MAX_SEC = 600; // jingles max 10 min, ponctuels
@@ -46,6 +64,7 @@ export function resolveActiveProgram(
   nowMs: number,
   tracks: Track[] = [],
   folders: TrackFolder[] = [],
+  programTracks: ProgramTrack[] = [],
 ): ResolvedState {
   const local = new Date(nowMs);
   const localDow = local.getDay();
@@ -93,8 +112,68 @@ export function resolveActiveProgram(
 
   // Auto DJ — uses only the tracks from the folder marked is_autodj_source.
   const autoDj = computeAutoDj(tracks, nowMs, folders);
+  const scheduledAudio = active && (active.type === "playlist" || active.type === "jingle")
+    ? computeProgramAudio(active, offsetSec, programTracks)
+    : null;
 
-  return { active, offsetSec, msUntilChange, autoDj };
+  return { active, offsetSec, msUntilChange, autoDj, scheduledAudio };
+}
+
+export function computeProgramAudio(program: Program, offsetSec: number, programTracks: ProgramTrack[] = []) {
+  const ordered = programTracks
+    .filter((pt) => pt.program_id === program.id && pt.track)
+    .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
+
+  if (ordered.length === 0) {
+    if (!program.audio_url) return null;
+    return {
+      key: `program:${program.id}:legacy`,
+      audioUrl: program.audio_url,
+      title: program.title || (program.type === "jingle" ? "Jingle" : "Lecture en cours"),
+      offsetSec,
+      durationSec: null,
+      index: 0,
+      track: null,
+    };
+  }
+
+  const playable = ordered.filter((pt) => (pt.track?.duration_seconds ?? 0) > 0);
+  if (playable.length === 0) {
+    const first = ordered[0].track!;
+    return {
+      key: `program:${program.id}:track:${first.id}`,
+      audioUrl: first.audio_url,
+      title: first.title,
+      offsetSec: 0,
+      durationSec: null,
+      index: 0,
+      track: first,
+    };
+  }
+
+  const total = playable.reduce((sum, pt) => sum + (pt.track?.duration_seconds ?? 0), 0);
+  if (total <= 0) return null;
+  const cursor = program.type === "jingle" ? offsetSec : offsetSec % total;
+  if (program.type === "jingle" && cursor >= total) return null;
+
+  let acc = 0;
+  for (let i = 0; i < playable.length; i++) {
+    const track = playable[i].track!;
+    const dur = track.duration_seconds ?? 0;
+    if (cursor < acc + dur) {
+      return {
+        key: `program:${program.id}:track:${track.id}:${i}`,
+        audioUrl: track.audio_url,
+        title: track.title,
+        offsetSec: cursor - acc,
+        durationSec: dur,
+        index: i,
+        track,
+      };
+    }
+    acc += dur;
+  }
+  return null;
 }
 
 /**
