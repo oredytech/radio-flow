@@ -106,11 +106,50 @@ export type Database = {
         }
         Relationships: []
       }
+      track_folders: {
+        Row: {
+          created_at: string
+          id: string
+          is_autodj_source: boolean
+          kind: string
+          name: string
+          position: number
+          radio_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_autodj_source?: boolean
+          kind?: string
+          name: string
+          position?: number
+          radio_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_autodj_source?: boolean
+          kind?: string
+          name?: string
+          position?: number
+          radio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_folders_radio_id_fkey"
+            columns: ["radio_id"]
+            isOneToOne: false
+            referencedRelation: "radios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracks: {
         Row: {
           audio_url: string
           created_at: string
           duration_seconds: number | null
+          folder_id: string | null
           id: string
           kind: string
           position: number
@@ -121,6 +160,7 @@ export type Database = {
           audio_url: string
           created_at?: string
           duration_seconds?: number | null
+          folder_id?: string | null
           id?: string
           kind?: string
           position?: number
@@ -131,6 +171,7 @@ export type Database = {
           audio_url?: string
           created_at?: string
           duration_seconds?: number | null
+          folder_id?: string | null
           id?: string
           kind?: string
           position?: number
@@ -138,6 +179,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tracks_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "track_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tracks_radio_id_fkey"
             columns: ["radio_id"]
