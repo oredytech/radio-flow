@@ -55,6 +55,36 @@ function createTickerWorker(intervalMs: number): Worker {
   return new Worker(URL.createObjectURL(blob));
 }
 
+function waitForAudioReady(audio: HTMLAudioElement, timeoutMs = 7000) {
+  return new Promise<void>((resolve, reject) => {
+    let done = false;
+    const cleanup = () => {
+      audio.removeEventListener("loadedmetadata", onReady);
+      audio.removeEventListener("canplay", onReady);
+      audio.removeEventListener("error", onErr);
+      clearTimeout(timer);
+    };
+    const finish = (fn: () => void) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      fn();
+    };
+    const onReady = () => finish(resolve);
+    const onErr = () => finish(() => reject(new Error("audio load failed")));
+    const timer = window.setTimeout(() => finish(resolve), timeoutMs);
+    audio.addEventListener("loadedmetadata", onReady);
+    audio.addEventListener("canplay", onReady);
+    audio.addEventListener("error", onErr);
+    audio.load();
+  });
+}
+
+function nativeEnded(audio: HTMLAudioElement, knownDuration?: number | null) {
+  const dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (knownDuration ?? null);
+  return audio.ended || (!!dur && audio.currentTime >= Math.max(0, dur - NEAR_END_GUARD_SEC));
+}
+
 // Identifier for what is currently loaded into the playlist audio element.
 // Format: "prog:<id>" | "track:<id>" | null
 type CurrentSourceKey = string | null;
