@@ -311,17 +311,6 @@ const RadioDetail = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div>
-                            <Label>Jour</Label>
-                            <Select value={form.day} onValueChange={(v) => setForm((f) => ({ ...f, day: v }))}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {DAY_LABELS.map((d, i) => (
-                                  <SelectItem key={i} value={String(i)}>{d}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
                         </div>
                         <div>
                           <Label htmlFor="title">Titre (optionnel)</Label>
@@ -329,17 +318,26 @@ const RadioDetail = () => {
                             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                             placeholder="Matinale du jour" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label htmlFor="start">Début</Label>
-                            <Input id="start" type="time" required value={form.start}
-                              onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label>Créneaux</Label>
+                            {!form.id && (
+                              <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, slots: [...f.slots, { day: "1", start: "09:00", end: "12:00" }] }))}>
+                                <Plus className="mr-1 h-3.5 w-3.5" /> Ajouter
+                              </Button>
+                            )}
                           </div>
-                          <div>
-                            <Label htmlFor="end">Fin</Label>
-                            <Input id="end" type="time" required value={form.end}
-                              onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} />
-                          </div>
+                          {form.slots.map((slot, idx) => (
+                            <div key={idx} className="grid grid-cols-1 gap-2 rounded-md border border-border bg-background/50 p-2 sm:grid-cols-[1fr,120px,120px,36px]">
+                              <Select value={slot.day} onValueChange={(v) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, day: v } : s) }))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{DAY_LABELS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
+                              </Select>
+                              <Input type="time" required value={slot.start} onChange={(e) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, start: e.target.value } : s) }))} />
+                              <Input type="time" required value={slot.end} onChange={(e) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, end: e.target.value } : s) }))} />
+                              {!form.id && form.slots.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setForm((f) => ({ ...f, slots: f.slots.filter((_, i) => i !== idx) }))}><Trash2 className="h-4 w-4" /></Button>}
+                            </div>
+                          ))}
                         </div>
 
                         {form.type === "live" ? (
