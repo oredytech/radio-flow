@@ -55,6 +55,8 @@ const RadioDetail = () => {
   const [radio, setRadio] = useState<RadioRow | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -78,6 +80,10 @@ const RadioDetail = () => {
       .then(({ data }) => setPrograms(data ?? []));
     supabase.from("tracks").select("*").eq("radio_id", id)
       .then(({ data }) => setTracks(data ?? []));
+    supabase.from("track_folders").select("*").eq("radio_id", id).order("position")
+      .then(({ data }) => setFolders(data ?? []));
+    supabase.from("program_tracks").select("*, track:tracks(*)").order("position")
+      .then(({ data }) => setProgramTracks((data ?? []).filter((pt) => pt.track?.radio_id === id) as ProgramTrack[]));
   }, [id]);
 
   const embedUrl = `${window.location.origin}/embed/${radio?.slug ?? ""}${embedAutoplay ? "?autoplay=1" : ""}`;
@@ -105,47 +111,41 @@ const RadioDetail = () => {
 
   // Resolve effective audio URL from form
   const effectiveAudioUrl = useMemo(() => {
-    if (form.audioSource === "library") {
-      const t = tracks.find((x) => x.id === form.audioTrackId);
-      return t?.audio_url ?? "";
-    }
+    if (form.audioSource === "library") return tracks.find((x) => x.id === form.audioTrackIds[0])?.audio_url ?? "";
     return form.audioUrl;
-  }, [form.audioSource, form.audioTrackId, form.audioUrl, tracks]);
+  }, [form.audioSource, form.audioTrackIds, form.audioUrl, tracks]);
 
   const formError = useMemo(() => {
     if (!radio) return null;
-    if (form.end <= form.start) return "L'heure de fin doit être après le début.";
-    if ((form.type === "playlist" || form.type === "jingle") && !effectiveAudioUrl) {
-      return "Sélectionnez ou indiquez un audio.";
+    if (form.slots.some((slot) => slot.end <= slot.start)) return "L'heure de fin doit être après le début.";
+    if (form.type !== "live" && form.audioSource === "library" && form.audioTrackIds.length === 0) {
+      return "Sélectionnez au moins une piste.";
+    }
+    if (form.type !== "live" && form.audioSource === "url" && !form.audioUrl) {
+      return "Indiquez une URL audio.";
     }
     if (form.type === "live" && !form.streamUrl) return "URL de stream requise pour un direct.";
-    if (form.type !== "jingle" && overlapsExisting(programs, {
-      id: form.id,
-      radio_id: radio.id,
-      day_of_week: Number(form.day),
-      type: form.type,
-      start_time: form.start,
-      end_time: form.end,
-    })) {
+    if (form.type !== "jingle" && form.slots.some((slot) => overlapsExisting(programs, {
+      id: form.id, radio_id: radio.id, day_of_week: Number(slot.day), type: form.type,
+      start_time: slot.start, end_time: slot.end,
+    }))) {
       return `Chevauchement avec une autre programmation ${form.type === "live" ? "en direct" : "playlist"} ce jour-là.`;
     }
     return null;
-  }, [form, programs, radio, effectiveAudioUrl]);
+  }, [form, programs, radio]);
 
   const openCreate = () => { setForm(emptyForm()); setOpen(true); };
   const openEdit = (p: Program) => {
-    // Prefill audioSource based on whether the audio_url matches a track
+    const linked = programTracks.filter((pt) => pt.program_id === p.id).sort((a, b) => a.position - b.position);
     const matched = tracks.find((t) => t.audio_url === p.audio_url);
     setForm({
       id: p.id,
       type: p.type as ProgType,
       title: p.title ?? "",
-      day: String(p.day_of_week),
-      start: p.start_time.slice(0, 5),
-      end: p.end_time.slice(0, 5),
-      audioUrl: matched ? "" : (p.audio_url ?? ""),
-      audioSource: matched ? "library" : (p.audio_url ? "url" : "library"),
-      audioTrackId: matched?.id ?? "",
+      slots: [{ day: String(p.day_of_week), start: p.start_time.slice(0, 5), end: p.end_time.slice(0, 5) }],
+      audioUrl: linked.length || matched ? "" : (p.audio_url ?? ""),
+      audioSource: linked.length || matched ? "library" : (p.audio_url ? "url" : "library"),
+      audioTrackIds: linked.length ? linked.map((pt) => pt.track_id) : (matched ? [matched.id] : []),
       streamUrl: p.stream_url ?? "",
     });
     setOpen(true);
