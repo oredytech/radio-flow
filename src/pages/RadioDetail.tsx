@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
@@ -18,26 +18,27 @@ import type { Tables } from "@/integrations/supabase/types";
 type RadioRow = Tables<"radios">;
 type Program = Tables<"programs">;
 type Track = Tables<"tracks">;
+type Folder = Tables<"track_folders">;
+type ProgramTrack = Tables<"program_tracks"> & { track?: Track | null };
 
 type ProgType = "playlist" | "live" | "jingle";
+
+interface TimeSlot { day: string; start: string; end: string; }
 
 interface FormState {
   id?: string;
   type: ProgType;
   title: string;
-  day: string;
-  start: string;
-  end: string;
+  slots: TimeSlot[];
   audioUrl: string;     // chosen URL for playlist/jingle (from library or external)
   audioSource: "library" | "url";
-  audioTrackId: string; // when audioSource = "library"
+  audioTrackIds: string[]; // ordered tracks when audioSource = "library"
   streamUrl: string;
 }
 
 const emptyForm = (): FormState => ({
-  type: "playlist", title: "", day: "1",
-  start: "09:00", end: "12:00",
-  audioUrl: "", audioSource: "library", audioTrackId: "",
+  type: "playlist", title: "", slots: [{ day: "1", start: "09:00", end: "12:00" }],
+  audioUrl: "", audioSource: "library", audioTrackIds: [],
   streamUrl: "",
 });
 
@@ -54,6 +55,8 @@ const RadioDetail = () => {
   const [radio, setRadio] = useState<RadioRow | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -77,6 +80,10 @@ const RadioDetail = () => {
       .then(({ data }) => setPrograms(data ?? []));
     supabase.from("tracks").select("*").eq("radio_id", id)
       .then(({ data }) => setTracks(data ?? []));
+    supabase.from("track_folders").select("*").eq("radio_id", id).order("position")
+      .then(({ data }) => setFolders(data ?? []));
+    supabase.from("program_tracks").select("*, track:tracks(*)").order("position")
+      .then(({ data }) => setProgramTracks((data ?? []).filter((pt) => pt.track?.radio_id === id) as ProgramTrack[]));
   }, [id]);
 
   const embedUrl = `${window.location.origin}/embed/${radio?.slug ?? ""}${embedAutoplay ? "?autoplay=1" : ""}`;
@@ -104,47 +111,67 @@ const RadioDetail = () => {
 
   // Resolve effective audio URL from form
   const effectiveAudioUrl = useMemo(() => {
-    if (form.audioSource === "library") {
-      const t = tracks.find((x) => x.id === form.audioTrackId);
-      return t?.audio_url ?? "";
-    }
+    if (form.audioSource === "library") return tracks.find((x) => x.id === form.audioTrackIds[0])?.audio_url ?? "";
     return form.audioUrl;
-  }, [form.audioSource, form.audioTrackId, form.audioUrl, tracks]);
+  }, [form.audioSource, form.audioTrackIds, form.audioUrl, tracks]);
+
+  const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
+  const schedulableTracks = useMemo(() => tracks
+    .filter((t) => {
+      const folder = t.folder_id ? folderById.get(t.folder_id) : null;
+      return !folder || folder.kind === "shows" || folder.kind === "jingles";
+    })
+    .sort((a, b) => (folderById.get(a.folder_id ?? "")?.position ?? 99) - (folderById.get(b.folder_id ?? "")?.position ?? 99) || a.position - b.position),
+  [tracks, folderById]);
+  const selectedTracks = useMemo(() => form.audioTrackIds
+    .map((trackId) => tracks.find((t) => t.id === trackId))
+    .filter(Boolean) as Track[], [form.audioTrackIds, tracks]);
 
   const formError = useMemo(() => {
     if (!radio) return null;
-    if (form.end <= form.start) return "L'heure de fin doit être après le début.";
-    if ((form.type === "playlist" || form.type === "jingle") && !effectiveAudioUrl) {
-      return "Sélectionnez ou indiquez un audio.";
+    if (form.slots.some((slot) => slot.end <= slot.start)) return "L'heure de fin doit être après le début.";
+    if (form.type !== "live" && form.audioSource === "library" && form.audioTrackIds.length === 0) {
+      return "Sélectionnez au moins une piste.";
+    }
+    if (form.type !== "live" && form.audioSource === "url" && !form.audioUrl) {
+      return "Indiquez une URL audio.";
     }
     if (form.type === "live" && !form.streamUrl) return "URL de stream requise pour un direct.";
-    if (form.type !== "jingle" && overlapsExisting(programs, {
-      id: form.id,
-      radio_id: radio.id,
-      day_of_week: Number(form.day),
-      type: form.type,
-      start_time: form.start,
-      end_time: form.end,
-    })) {
+    if (form.type !== "jingle" && form.slots.some((slot) => overlapsExisting(programs, {
+      id: form.id, radio_id: radio.id, day_of_week: Number(slot.day), type: form.type,
+      start_time: slot.start, end_time: slot.end,
+    }))) {
       return `Chevauchement avec une autre programmation ${form.type === "live" ? "en direct" : "playlist"} ce jour-là.`;
     }
     return null;
-  }, [form, programs, radio, effectiveAudioUrl]);
+  }, [form, programs, radio]);
+
+  const refreshProgramTracks = async () => {
+    if (!radio) return;
+    const { data } = await supabase.from("program_tracks").select("*, track:tracks(*)").order("position");
+    setProgramTracks((data ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
+  };
+
+  const saveProgramTracks = async (programId: string) => {
+    await supabase.from("program_tracks").delete().eq("program_id", programId);
+    if (form.type === "live" || form.audioSource !== "library" || form.audioTrackIds.length === 0) return null;
+    return supabase.from("program_tracks").insert(
+      form.audioTrackIds.map((trackId, position) => ({ program_id: programId, track_id: trackId, position })),
+    );
+  };
 
   const openCreate = () => { setForm(emptyForm()); setOpen(true); };
   const openEdit = (p: Program) => {
-    // Prefill audioSource based on whether the audio_url matches a track
+    const linked = programTracks.filter((pt) => pt.program_id === p.id).sort((a, b) => a.position - b.position);
     const matched = tracks.find((t) => t.audio_url === p.audio_url);
     setForm({
       id: p.id,
       type: p.type as ProgType,
       title: p.title ?? "",
-      day: String(p.day_of_week),
-      start: p.start_time.slice(0, 5),
-      end: p.end_time.slice(0, 5),
-      audioUrl: matched ? "" : (p.audio_url ?? ""),
-      audioSource: matched ? "library" : (p.audio_url ? "url" : "library"),
-      audioTrackId: matched?.id ?? "",
+      slots: [{ day: String(p.day_of_week), start: p.start_time.slice(0, 5), end: p.end_time.slice(0, 5) }],
+      audioUrl: linked.length || matched ? "" : (p.audio_url ?? ""),
+      audioSource: linked.length || matched ? "library" : (p.audio_url ? "url" : "library"),
+      audioTrackIds: linked.length ? linked.map((pt) => pt.track_id) : (matched ? [matched.id] : []),
       streamUrl: p.stream_url ?? "",
     });
     setOpen(true);
@@ -154,30 +181,38 @@ const RadioDetail = () => {
     e.preventDefault();
     if (!radio || formError) return;
     setSaving(true);
-    const payload = {
+    const toPayload = (slot: TimeSlot) => ({
       radio_id: radio.id,
       type: form.type,
       title: form.title || null,
-      day_of_week: Number(form.day),
-      start_time: form.start,
-      end_time: form.end,
+      day_of_week: Number(slot.day),
+      start_time: slot.start,
+      end_time: slot.end,
       audio_url: form.type === "live" ? null : effectiveAudioUrl,
       stream_url: form.type === "live" ? form.streamUrl : null,
-    };
+    });
     if (form.id) {
-      const { data, error } = await supabase.from("programs").update(payload).eq("id", form.id).select().single();
+      const { data, error } = await supabase.from("programs").update(toPayload(form.slots[0])).eq("id", form.id).select().single();
       setSaving(false);
       if (error) { toast.error(error.message); return; }
+      const rel = await saveProgramTracks(form.id);
+      if (rel?.error) { toast.error(rel.error.message); return; }
+      await refreshProgramTracks();
       setPrograms((p) => p.map((x) => x.id === form.id ? data : x)
         .sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)));
       toast.success("Programme mis à jour");
     } else {
-      const { data, error } = await supabase.from("programs").insert(payload).select().single();
+      const { data, error } = await supabase.from("programs").insert(form.slots.map(toPayload)).select();
       setSaving(false);
       if (error) { toast.error(error.message); return; }
-      setPrograms((p) => [...p, data]
+      for (const row of data ?? []) {
+        const rel = await saveProgramTracks(row.id);
+        if (rel?.error) { toast.error(rel.error.message); return; }
+      }
+      await refreshProgramTracks();
+      setPrograms((p) => [...p, ...(data ?? [])]
         .sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)));
-      toast.success("Programme ajouté");
+      toast.success(form.slots.length > 1 ? "Programmes ajoutés" : "Programme ajouté");
     }
     setOpen(false);
     setForm(emptyForm());
@@ -276,17 +311,6 @@ const RadioDetail = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div>
-                            <Label>Jour</Label>
-                            <Select value={form.day} onValueChange={(v) => setForm((f) => ({ ...f, day: v }))}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {DAY_LABELS.map((d, i) => (
-                                  <SelectItem key={i} value={String(i)}>{d}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
                         </div>
                         <div>
                           <Label htmlFor="title">Titre (optionnel)</Label>
@@ -294,17 +318,26 @@ const RadioDetail = () => {
                             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                             placeholder="Matinale du jour" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label htmlFor="start">Début</Label>
-                            <Input id="start" type="time" required value={form.start}
-                              onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label>Créneaux</Label>
+                            {!form.id && (
+                              <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, slots: [...f.slots, { day: "1", start: "09:00", end: "12:00" }] }))}>
+                                <Plus className="mr-1 h-3.5 w-3.5" /> Ajouter
+                              </Button>
+                            )}
                           </div>
-                          <div>
-                            <Label htmlFor="end">Fin</Label>
-                            <Input id="end" type="time" required value={form.end}
-                              onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} />
-                          </div>
+                          {form.slots.map((slot, idx) => (
+                            <div key={idx} className="grid grid-cols-1 gap-2 rounded-md border border-border bg-background/50 p-2 sm:grid-cols-[1fr,120px,120px,36px]">
+                              <Select value={slot.day} onValueChange={(v) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, day: v } : s) }))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{DAY_LABELS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
+                              </Select>
+                              <Input type="time" required value={slot.start} onChange={(e) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, start: e.target.value } : s) }))} />
+                              <Input type="time" required value={slot.end} onChange={(e) => setForm((f) => ({ ...f, slots: f.slots.map((s, i) => i === idx ? { ...s, end: e.target.value } : s) }))} />
+                              {!form.id && form.slots.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setForm((f) => ({ ...f, slots: f.slots.filter((_, i) => i !== idx) }))}><Trash2 className="h-4 w-4" /></Button>}
+                            </div>
+                          ))}
                         </div>
 
                         {form.type === "live" ? (
@@ -336,19 +369,29 @@ const RadioDetail = () => {
                                   Bibliothèque vide. Allez dans l'onglet Bibliothèque pour uploader des audios.
                                 </p>
                               ) : (
-                                <Select value={form.audioTrackId} onValueChange={(v) => setForm((f) => ({ ...f, audioTrackId: v }))}>
-                                  <SelectTrigger><SelectValue placeholder="Choisir une piste" /></SelectTrigger>
-                                  <SelectContent>
-                                    {tracks
-                                      .slice()
-                                      .sort((a, b) => a.position - b.position)
-                                      .map((t) => (
-                                        <SelectItem key={t.id} value={t.id}>
-                                          [{t.kind === "jingle" ? "Jingle" : "Musique"}] {t.title}
-                                        </SelectItem>
+                                <div className="space-y-2">
+                                  <Select value="" onValueChange={(v) => setForm((f) => f.audioTrackIds.includes(v) ? f : ({ ...f, audioTrackIds: [...f.audioTrackIds, v] }))}>
+                                    <SelectTrigger><SelectValue placeholder="Ajouter une piste depuis Émissions ou Jingles" /></SelectTrigger>
+                                    <SelectContent>
+                                      {schedulableTracks.filter((t) => !form.audioTrackIds.includes(t.id)).map((t) => {
+                                        const folder = t.folder_id ? folderById.get(t.folder_id) : null;
+                                        return <SelectItem key={t.id} value={t.id}>[{folder?.name ?? (t.kind === "jingle" ? "Jingles" : "Émissions")}] {t.title}</SelectItem>;
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                  {selectedTracks.length > 0 && (
+                                    <div className="space-y-1.5 rounded-md border border-border bg-background/50 p-2">
+                                      {selectedTracks.map((t, idx) => (
+                                        <div key={`${t.id}-${idx}`} className="flex min-w-0 items-center gap-1.5 rounded border border-border/60 px-2 py-1.5 text-xs">
+                                          <span className="min-w-0 flex-1 truncate">{idx + 1}. {t.title}</span>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; return { ...f, audioTrackIds: a }; })}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === selectedTracks.length - 1} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx + 1], a[idx]] = [a[idx], a[idx + 1]]; return { ...f, audioTrackIds: a }; })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setForm((f) => ({ ...f, audioTrackIds: f.audioTrackIds.filter((_, i) => i !== idx) }))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                        </div>
                                       ))}
-                                  </SelectContent>
-                                </Select>
+                                    </div>
+                                  )}
+                                </div>
                               )
                             ) : (
                               <Input type="url" value={form.audioUrl}

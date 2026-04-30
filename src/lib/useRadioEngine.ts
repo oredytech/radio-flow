@@ -4,14 +4,16 @@ import { startTimeSync, serverNow, syncServerTime } from "@/lib/time";
 import {
   resolveActiveProgram,
   type Program,
+  type ProgramTrack,
   type ResolvedState,
   type Track,
   type TrackFolder,
 } from "@/lib/schedule";
 
 const DRIFT_TOLERANCE_SEC = 1.2;
-const RESYNC_INTERVAL_MS = 4000;
+const RESYNC_INTERVAL_MS = 1000;
 const FADE_MS = 600;
+const NEAR_END_GUARD_SEC = 1.4;
 
 export interface EngineState extends ResolvedState {
   isPlaying: boolean;
@@ -53,6 +55,36 @@ function createTickerWorker(intervalMs: number): Worker {
   return new Worker(URL.createObjectURL(blob));
 }
 
+function waitForAudioReady(audio: HTMLAudioElement, timeoutMs = 7000) {
+  return new Promise<void>((resolve, reject) => {
+    let done = false;
+    const cleanup = () => {
+      audio.removeEventListener("loadedmetadata", onReady);
+      audio.removeEventListener("canplay", onReady);
+      audio.removeEventListener("error", onErr);
+      clearTimeout(timer);
+    };
+    const finish = (fn: () => void) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      fn();
+    };
+    const onReady = () => finish(resolve);
+    const onErr = () => finish(() => reject(new Error("audio load failed")));
+    const timer = window.setTimeout(() => finish(resolve), timeoutMs);
+    audio.addEventListener("loadedmetadata", onReady);
+    audio.addEventListener("canplay", onReady);
+    audio.addEventListener("error", onErr);
+    audio.load();
+  });
+}
+
+function nativeEnded(audio: HTMLAudioElement, knownDuration?: number | null) {
+  const dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (knownDuration ?? null);
+  return audio.ended || (!!dur && audio.currentTime >= Math.max(0, dur - NEAR_END_GUARD_SEC));
+}
+
 // Identifier for what is currently loaded into the playlist audio element.
 // Format: "prog:<id>" | "track:<id>" | null
 type CurrentSourceKey = string | null;
@@ -61,11 +93,13 @@ export function useRadioEngine(slug: string) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [folders, setFolders] = useState<TrackFolder[]>([]);
+  const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
   const [state, setState] = useState<EngineState>({
     active: null,
     offsetSec: 0,
     msUntilChange: 60000,
     autoDj: null,
+    scheduledAudio: null,
     isPlaying: false,
     isReady: false,
     error: null,
@@ -119,15 +153,17 @@ export function useRadioEngine(slug: string) {
         if (!cancelled) setState((s) => ({ ...s, error: "Radio not found" }));
         return;
       }
-      const [{ data: progs }, { data: trks }, { data: flds }] = await Promise.all([
+      const [{ data: progs }, { data: trks }, { data: flds }, { data: pts }] = await Promise.all([
         supabase.from("programs").select("*").eq("radio_id", radio.id),
         supabase.from("tracks").select("*").eq("radio_id", radio.id),
         supabase.from("track_folders").select("*").eq("radio_id", radio.id),
+        supabase.from("program_tracks").select("*, track:tracks(*)").order("position"),
       ]);
       if (!cancelled) {
         setPrograms(progs ?? []);
         setTracks(trks ?? []);
         setFolders(flds ?? []);
+        setProgramTracks((pts ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
         setState((s) => ({ ...s, isReady: true }));
       }
       const channel = supabase
@@ -153,6 +189,13 @@ export function useRadioEngine(slug: string) {
               .from("track_folders").select("*").eq("radio_id", radio.id);
             if (!cancelled) setFolders(f2 ?? []);
           })
+        .on("postgres_changes",
+          { event: "*", schema: "public", table: "program_tracks" },
+          async () => {
+            const { data: pt2 } = await supabase
+              .from("program_tracks").select("*, track:tracks(*)").order("position");
+            if (!cancelled) setProgramTracks((pt2 ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
+          })
         .subscribe();
       cleanupFn = () => { supabase.removeChannel(channel); };
     })();
@@ -171,8 +214,8 @@ export function useRadioEngine(slug: string) {
       const liveAudio = liveRef.current!;
 
       const now = serverNow();
-      const resolved = resolveActiveProgram(programs, now, tracks, folders);
-      const { active, offsetSec, autoDj } = resolved;
+      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+      const { active, offsetSec, autoDj, scheduledAudio } = resolved;
 
       let driftCorrection = 0;
 
@@ -210,8 +253,13 @@ export function useRadioEngine(slug: string) {
 
       // ---- 2. Playlist or Jingle program (file-based) ---------------------
       if (active && (active.type === "playlist" || active.type === "jingle")) {
-        const key = `prog:${active.id}`;
-        const audioUrl = active.audio_url ?? "";
+        if (!scheduledAudio) {
+          currentKey.current = null;
+          setState((s) => ({ ...s, ...resolved, error: "Audio indisponible", source: "silence", currentTitle: null }));
+          return;
+        }
+        const key = scheduledAudio.key;
+        const audioUrl = scheduledAudio.audioUrl;
         const switched = currentKey.current !== key;
 
         if (!liveAudio.paused) {
@@ -223,22 +271,12 @@ export function useRadioEngine(slug: string) {
           try {
             playlistAudio.src = audioUrl;
             playlistAudio.volume = 0;
-            await new Promise<void>((res, rej) => {
-              const onLoaded = () => { cleanup(); res(); };
-              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-              const cleanup = () => {
-                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-                playlistAudio.removeEventListener("error", onErr);
-              };
-              playlistAudio.addEventListener("loadedmetadata", onLoaded);
-              playlistAudio.addEventListener("error", onErr);
-              playlistAudio.load();
-            });
+            await waitForAudioReady(playlistAudio);
             const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-              ? playlistAudio.duration : null;
+              ? playlistAudio.duration : scheduledAudio.durationSec;
             const target = active.type === "jingle"
-              ? Math.min(offsetSec, dur ?? offsetSec)
-              : (dur ? offsetSec % dur : offsetSec);
+              ? Math.min(scheduledAudio.offsetSec, dur ?? scheduledAudio.offsetSec)
+              : scheduledAudio.offsetSec;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
             await fade(playlistAudio, 1, FADE_MS);
@@ -251,8 +289,13 @@ export function useRadioEngine(slug: string) {
           }
         } else if (active.type === "playlist") {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-            ? playlistAudio.duration : null;
-          const target = dur ? offsetSec % dur : offsetSec;
+            ? playlistAudio.duration : scheduledAudio.durationSec;
+          if (nativeEnded(playlistAudio, dur)) {
+            currentKey.current = null;
+            window.setTimeout(() => tickFnRef.current?.().catch(() => {}), 0);
+            return;
+          }
+          const target = scheduledAudio.offsetSec;
           const diff = target - playlistAudio.currentTime;
           if (Math.abs(diff) > DRIFT_TOLERANCE_SEC) {
             playlistAudio.currentTime = Math.max(0, target);
@@ -267,7 +310,7 @@ export function useRadioEngine(slug: string) {
           error: null,
           driftCorrectionSec: driftCorrection,
           source: "program",
-          currentTitle: active.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
+          currentTitle: active.title || scheduledAudio.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
         });
         return;
       }
@@ -285,17 +328,7 @@ export function useRadioEngine(slug: string) {
           try {
             playlistAudio.src = track.audio_url;
             playlistAudio.volume = 0;
-            await new Promise<void>((res, rej) => {
-              const onLoaded = () => { cleanup(); res(); };
-              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-              const cleanup = () => {
-                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-                playlistAudio.removeEventListener("error", onErr);
-              };
-              playlistAudio.addEventListener("loadedmetadata", onLoaded);
-              playlistAudio.addEventListener("error", onErr);
-              playlistAudio.load();
-            });
+            await waitForAudioReady(playlistAudio);
             const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
               ? playlistAudio.duration : (track.duration_seconds ?? 0);
             const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
@@ -312,6 +345,11 @@ export function useRadioEngine(slug: string) {
         } else {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
             ? playlistAudio.duration : null;
+          if (nativeEnded(playlistAudio, dur ?? track.duration_seconds)) {
+            currentKey.current = null;
+            window.setTimeout(() => tickFnRef.current?.().catch(() => {}), 0);
+            return;
+          }
           // If the audio element has stopped (e.g. paused by OS) restart it.
           if (playlistAudio.paused) {
             try { await playlistAudio.play(); } catch { /* needs gesture */ }
@@ -352,7 +390,7 @@ export function useRadioEngine(slug: string) {
     } finally {
       tickingRef.current = false;
     }
-  }, [programs, tracks, folders, userStarted]);
+  }, [programs, tracks, folders, programTracks, userStarted]);
 
   // Keep latest tick fn in a ref so the audio "ended" listener can call it.
   useEffect(() => { tickFnRef.current = tick; }, [tick]);
@@ -402,9 +440,9 @@ export function useRadioEngine(slug: string) {
   useEffect(() => {
     if (programs.length === 0 && tracks.length === 0) return;
     const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks, folders);
+    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
     setState((s) => ({ ...s, ...resolved }));
-  }, [programs, tracks, folders]);
+  }, [programs, tracks, folders, programTracks]);
 
   const start = useCallback(async () => {
     await syncServerTime();
