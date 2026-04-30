@@ -181,30 +181,38 @@ const RadioDetail = () => {
     e.preventDefault();
     if (!radio || formError) return;
     setSaving(true);
-    const payload = {
+    const toPayload = (slot: TimeSlot) => ({
       radio_id: radio.id,
       type: form.type,
       title: form.title || null,
-      day_of_week: Number(form.day),
-      start_time: form.start,
-      end_time: form.end,
+      day_of_week: Number(slot.day),
+      start_time: slot.start,
+      end_time: slot.end,
       audio_url: form.type === "live" ? null : effectiveAudioUrl,
       stream_url: form.type === "live" ? form.streamUrl : null,
-    };
+    });
     if (form.id) {
-      const { data, error } = await supabase.from("programs").update(payload).eq("id", form.id).select().single();
+      const { data, error } = await supabase.from("programs").update(toPayload(form.slots[0])).eq("id", form.id).select().single();
       setSaving(false);
       if (error) { toast.error(error.message); return; }
+      const rel = await saveProgramTracks(form.id);
+      if (rel?.error) { toast.error(rel.error.message); return; }
+      await refreshProgramTracks();
       setPrograms((p) => p.map((x) => x.id === form.id ? data : x)
         .sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)));
       toast.success("Programme mis à jour");
     } else {
-      const { data, error } = await supabase.from("programs").insert(payload).select().single();
+      const { data, error } = await supabase.from("programs").insert(form.slots.map(toPayload)).select();
       setSaving(false);
       if (error) { toast.error(error.message); return; }
-      setPrograms((p) => [...p, data]
+      for (const row of data ?? []) {
+        const rel = await saveProgramTracks(row.id);
+        if (rel?.error) { toast.error(rel.error.message); return; }
+      }
+      await refreshProgramTracks();
+      setPrograms((p) => [...p, ...(data ?? [])]
         .sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)));
-      toast.success("Programme ajouté");
+      toast.success(form.slots.length > 1 ? "Programmes ajoutés" : "Programme ajouté");
     }
     setOpen(false);
     setForm(emptyForm());
