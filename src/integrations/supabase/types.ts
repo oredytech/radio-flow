@@ -32,6 +32,45 @@ export type Database = {
         }
         Relationships: []
       }
+      program_tracks: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          program_id: string
+          track_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          program_id: string
+          track_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          program_id?: string
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_tracks_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programs: {
         Row: {
           audio_url: string | null
