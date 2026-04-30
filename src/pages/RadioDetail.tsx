@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
@@ -18,26 +18,27 @@ import type { Tables } from "@/integrations/supabase/types";
 type RadioRow = Tables<"radios">;
 type Program = Tables<"programs">;
 type Track = Tables<"tracks">;
+type Folder = Tables<"track_folders">;
+type ProgramTrack = Tables<"program_tracks"> & { track?: Track | null };
 
 type ProgType = "playlist" | "live" | "jingle";
+
+interface TimeSlot { day: string; start: string; end: string; }
 
 interface FormState {
   id?: string;
   type: ProgType;
   title: string;
-  day: string;
-  start: string;
-  end: string;
+  slots: TimeSlot[];
   audioUrl: string;     // chosen URL for playlist/jingle (from library or external)
   audioSource: "library" | "url";
-  audioTrackId: string; // when audioSource = "library"
+  audioTrackIds: string[]; // ordered tracks when audioSource = "library"
   streamUrl: string;
 }
 
 const emptyForm = (): FormState => ({
-  type: "playlist", title: "", day: "1",
-  start: "09:00", end: "12:00",
-  audioUrl: "", audioSource: "library", audioTrackId: "",
+  type: "playlist", title: "", slots: [{ day: "1", start: "09:00", end: "12:00" }],
+  audioUrl: "", audioSource: "library", audioTrackIds: [],
   streamUrl: "",
 });
 
