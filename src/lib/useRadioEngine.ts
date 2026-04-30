@@ -328,17 +328,7 @@ export function useRadioEngine(slug: string) {
           try {
             playlistAudio.src = track.audio_url;
             playlistAudio.volume = 0;
-            await new Promise<void>((res, rej) => {
-              const onLoaded = () => { cleanup(); res(); };
-              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-              const cleanup = () => {
-                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-                playlistAudio.removeEventListener("error", onErr);
-              };
-              playlistAudio.addEventListener("loadedmetadata", onLoaded);
-              playlistAudio.addEventListener("error", onErr);
-              playlistAudio.load();
-            });
+            await waitForAudioReady(playlistAudio);
             const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
               ? playlistAudio.duration : (track.duration_seconds ?? 0);
             const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
@@ -355,6 +345,11 @@ export function useRadioEngine(slug: string) {
         } else {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
             ? playlistAudio.duration : null;
+          if (nativeEnded(playlistAudio, dur ?? track.duration_seconds)) {
+            currentKey.current = null;
+            window.setTimeout(() => tickFnRef.current?.().catch(() => {}), 0);
+            return;
+          }
           // If the audio element has stopped (e.g. paused by OS) restart it.
           if (playlistAudio.paused) {
             try { await playlistAudio.play(); } catch { /* needs gesture */ }
@@ -395,7 +390,7 @@ export function useRadioEngine(slug: string) {
     } finally {
       tickingRef.current = false;
     }
-  }, [programs, tracks, folders, userStarted]);
+  }, [programs, tracks, folders, programTracks, userStarted]);
 
   // Keep latest tick fn in a ref so the audio "ended" listener can call it.
   useEffect(() => { tickFnRef.current = tick; }, [tick]);
