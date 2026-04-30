@@ -4,14 +4,16 @@ import { startTimeSync, serverNow, syncServerTime } from "@/lib/time";
 import {
   resolveActiveProgram,
   type Program,
+  type ProgramTrack,
   type ResolvedState,
   type Track,
   type TrackFolder,
 } from "@/lib/schedule";
 
 const DRIFT_TOLERANCE_SEC = 1.2;
-const RESYNC_INTERVAL_MS = 4000;
+const RESYNC_INTERVAL_MS = 1000;
 const FADE_MS = 600;
+const NEAR_END_GUARD_SEC = 1.4;
 
 export interface EngineState extends ResolvedState {
   isPlaying: boolean;
@@ -61,11 +63,13 @@ export function useRadioEngine(slug: string) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [folders, setFolders] = useState<TrackFolder[]>([]);
+  const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
   const [state, setState] = useState<EngineState>({
     active: null,
     offsetSec: 0,
     msUntilChange: 60000,
     autoDj: null,
+    scheduledAudio: null,
     isPlaying: false,
     isReady: false,
     error: null,
