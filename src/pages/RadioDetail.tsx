@@ -369,19 +369,29 @@ const RadioDetail = () => {
                                   Bibliothèque vide. Allez dans l'onglet Bibliothèque pour uploader des audios.
                                 </p>
                               ) : (
-                                <Select value={form.audioTrackId} onValueChange={(v) => setForm((f) => ({ ...f, audioTrackId: v }))}>
-                                  <SelectTrigger><SelectValue placeholder="Choisir une piste" /></SelectTrigger>
-                                  <SelectContent>
-                                    {tracks
-                                      .slice()
-                                      .sort((a, b) => a.position - b.position)
-                                      .map((t) => (
-                                        <SelectItem key={t.id} value={t.id}>
-                                          [{t.kind === "jingle" ? "Jingle" : "Musique"}] {t.title}
-                                        </SelectItem>
+                                <div className="space-y-2">
+                                  <Select value="" onValueChange={(v) => setForm((f) => f.audioTrackIds.includes(v) ? f : ({ ...f, audioTrackIds: [...f.audioTrackIds, v] }))}>
+                                    <SelectTrigger><SelectValue placeholder="Ajouter une piste depuis Émissions ou Jingles" /></SelectTrigger>
+                                    <SelectContent>
+                                      {schedulableTracks.filter((t) => !form.audioTrackIds.includes(t.id)).map((t) => {
+                                        const folder = t.folder_id ? folderById.get(t.folder_id) : null;
+                                        return <SelectItem key={t.id} value={t.id}>[{folder?.name ?? (t.kind === "jingle" ? "Jingles" : "Émissions")}] {t.title}</SelectItem>;
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                  {selectedTracks.length > 0 && (
+                                    <div className="space-y-1.5 rounded-md border border-border bg-background/50 p-2">
+                                      {selectedTracks.map((t, idx) => (
+                                        <div key={`${t.id}-${idx}`} className="flex min-w-0 items-center gap-1.5 rounded border border-border/60 px-2 py-1.5 text-xs">
+                                          <span className="min-w-0 flex-1 truncate">{idx + 1}. {t.title}</span>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; return { ...f, audioTrackIds: a }; })}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === selectedTracks.length - 1} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx + 1], a[idx]] = [a[idx], a[idx + 1]]; return { ...f, audioTrackIds: a }; })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setForm((f) => ({ ...f, audioTrackIds: f.audioTrackIds.filter((_, i) => i !== idx) }))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                        </div>
                                       ))}
-                                  </SelectContent>
-                                </Select>
+                                    </div>
+                                  )}
+                                </div>
                               )
                             ) : (
                               <Input type="url" value={form.audioUrl}
