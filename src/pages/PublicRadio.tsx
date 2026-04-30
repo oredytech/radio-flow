@@ -137,6 +137,21 @@ const PublicRadio = () => {
             <RadioPlayer slug={radio.slug} radioName={radio.name} />
           </div>
 
+          {upload && (
+            <div className="mt-3 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <Upload className="h-3.5 w-3.5 shrink-0 animate-pulse text-primary" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold">
+                    Mise à jour de la bibliothèque · {upload.remaining} fichier{upload.remaining > 1 ? "s" : ""}
+                  </span>
+                  <span className="tabular-nums text-primary">{upload.pct}% · {fmtEta(upload.etaSec)}</span>
+                </div>
+                <Progress value={upload.pct} className="mt-1 h-1" />
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={async () => {
               const url = window.location.href;
