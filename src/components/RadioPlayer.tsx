@@ -11,10 +11,16 @@ interface RadioPlayerProps {
   theme?: "dark" | "light";
   minimal?: boolean;
   autoplay?: boolean;
+  /**
+   * When true, exposes internal sources (AutoDJ vs program, drift, track titles).
+   * The owner dashboard sets this to true. Public listeners always see "À l'antenne".
+   */
+  showInternalSource?: boolean;
 }
 
 export function RadioPlayer({
   slug, radioName, theme = "dark", minimal = false, autoplay = false,
+  showInternalSource = false,
 }: RadioPlayerProps) {
   const { state, start, stop, userStarted } = useRadioEngine(slug);
   const [autoTried, setAutoTried] = useState(false);
@@ -75,7 +81,7 @@ export function RadioPlayer({
               ● En direct
             </span>
           )}
-          {!isLive && userStarted && state.source === "program" && (
+          {!isLive && userStarted && (state.source === "program" || (state.source === "autodj" && !showInternalSource)) && (
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
               <span className="equalizer-bar" />
               <span className="equalizer-bar" />
@@ -83,7 +89,7 @@ export function RadioPlayer({
               <span className="ml-1">À l'antenne</span>
             </span>
           )}
-          {isAutoDj && userStarted && (
+          {isAutoDj && userStarted && showInternalSource && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--neon-violet))]/20 text-[hsl(var(--neon-violet))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
               <span className="equalizer-bar" />
               <span className="equalizer-bar" />
@@ -97,23 +103,30 @@ export function RadioPlayer({
           )}
         </div>
         <div className="mt-1 truncate text-sm sm:text-base font-semibold">
-          {userStarted
-            ? (state.currentTitle || (state.source === "silence" ? "Hors antenne" : "Lecture en cours"))
-            : (state.active?.title || (state.active ? "Programme prêt" : (state.autoDj?.track ? `Auto DJ · ${state.autoDj.track.title}` : "Hors antenne")))}
+          {(() => {
+            if (!userStarted) {
+              return state.active?.title || (state.active ? "Programme prêt" : (radioName || "Hors antenne"));
+            }
+            // Listener view: don't reveal AutoDJ track titles
+            if (state.source === "autodj" && !showInternalSource) {
+              return radioName || "À l'antenne";
+            }
+            return state.currentTitle || (state.source === "silence" ? "Hors antenne" : "Lecture en cours");
+          })()}
         </div>
-        {!minimal && (state.active || isAutoDj) && (
+        {!minimal && (state.active || (isAutoDj && showInternalSource)) && (
           <div className="mt-0.5 truncate text-[11px] sm:text-xs text-muted-foreground">
             {state.active && (
               <>
                 {secToHHMM(timeToSec(state.active.start_time))} – {secToHHMM(timeToSec(state.active.end_time))}
-                {!isLive && userStarted && state.source === "program" && (
+                {!isLive && userStarted && state.source === "program" && showInternalSource && (
                   <span className="ml-2 opacity-70">
                     offset {Math.floor(state.offsetSec / 60)}:{(Math.floor(state.offsetSec) % 60).toString().padStart(2, "0")}
                   </span>
                 )}
               </>
             )}
-            {!state.active && isAutoDj && state.autoDj?.track && (
+            {!state.active && isAutoDj && showInternalSource && state.autoDj?.track && (
               <span>Rotation continue · piste {state.autoDj.index + 1}</span>
             )}
           </div>
