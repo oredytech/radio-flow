@@ -6,6 +6,7 @@ import {
   type Program,
   type ResolvedState,
   type Track,
+  type TrackFolder,
 } from "@/lib/schedule";
 
 const DRIFT_TOLERANCE_SEC = 1.2;
@@ -38,6 +39,20 @@ function fade(audio: HTMLAudioElement, to: number, ms: number) {
   });
 }
 
+/**
+ * Spawn a Web Worker that fires "tick" messages on a steady cadence.
+ * This is the secret sauce for keeping the AutoDJ alive when the tab is
+ * backgrounded or the device screen sleeps — `setInterval` in the main
+ * thread gets throttled to ~1Hz (or worse) by browsers, but workers keep
+ * running. The MediaSession + an actively playing <audio> element keep
+ * the page from being fully suspended on mobile.
+ */
+function createTickerWorker(intervalMs: number): Worker {
+  const src = `let id=null;onmessage=(e)=>{if(e.data==='start'){if(id)clearInterval(id);id=setInterval(()=>postMessage('tick'),${intervalMs});}else if(e.data==='stop'){if(id){clearInterval(id);id=null;}}};`;
+  const blob = new Blob([src], { type: "application/javascript" });
+  return new Worker(URL.createObjectURL(blob));
+}
+
 // Identifier for what is currently loaded into the playlist audio element.
 // Format: "prog:<id>" | "track:<id>" | null
 type CurrentSourceKey = string | null;
@@ -45,6 +60,7 @@ type CurrentSourceKey = string | null;
 export function useRadioEngine(slug: string) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [folders, setFolders] = useState<TrackFolder[]>([]);
   const [state, setState] = useState<EngineState>({
     active: null,
     offsetSec: 0,
@@ -62,6 +78,8 @@ export function useRadioEngine(slug: string) {
   const playlistRef = useRef<HTMLAudioElement | null>(null);
   const liveRef = useRef<HTMLAudioElement | null>(null);
   const currentKey = useRef<CurrentSourceKey>(null);
+  const tickingRef = useRef(false);
+  const tickFnRef = useRef<() => Promise<void>>();
 
   // Lazy create audio elements
   useEffect(() => {
@@ -69,6 +87,13 @@ export function useRadioEngine(slug: string) {
     a.preload = "auto";
     a.crossOrigin = "anonymous";
     a.volume = 0;
+    // No native loop — we drive transitions via tick(); but ended must trigger
+    // an immediate re-evaluation to avoid silence when the tab is backgrounded.
+    a.addEventListener("ended", () => {
+      // currentKey reset so tick() reloads the next track from scratch.
+      currentKey.current = null;
+      tickFnRef.current?.().catch(() => {});
+    });
     playlistRef.current = a;
     const b = new Audio();
     b.preload = "auto";
@@ -83,7 +108,7 @@ export function useRadioEngine(slug: string) {
     };
   }, []);
 
-  // Load radio + programs + tracks
+  // Load radio + programs + tracks + folders
   useEffect(() => {
     let cancelled = false;
     let cleanupFn: (() => void) | undefined;
@@ -94,13 +119,15 @@ export function useRadioEngine(slug: string) {
         if (!cancelled) setState((s) => ({ ...s, error: "Radio not found" }));
         return;
       }
-      const [{ data: progs }, { data: trks }] = await Promise.all([
+      const [{ data: progs }, { data: trks }, { data: flds }] = await Promise.all([
         supabase.from("programs").select("*").eq("radio_id", radio.id),
         supabase.from("tracks").select("*").eq("radio_id", radio.id),
+        supabase.from("track_folders").select("*").eq("radio_id", radio.id),
       ]);
       if (!cancelled) {
         setPrograms(progs ?? []);
         setTracks(trks ?? []);
+        setFolders(flds ?? []);
         setState((s) => ({ ...s, isReady: true }));
       }
       const channel = supabase
@@ -119,6 +146,13 @@ export function useRadioEngine(slug: string) {
               .from("tracks").select("*").eq("radio_id", radio.id);
             if (!cancelled) setTracks(t2 ?? []);
           })
+        .on("postgres_changes",
+          { event: "*", schema: "public", table: "track_folders", filter: `radio_id=eq.${radio.id}` },
+          async () => {
+            const { data: f2 } = await supabase
+              .from("track_folders").select("*").eq("radio_id", radio.id);
+            if (!cancelled) setFolders(f2 ?? []);
+          })
         .subscribe();
       cleanupFn = () => { supabase.removeChannel(channel); };
     })();
@@ -130,93 +164,92 @@ export function useRadioEngine(slug: string) {
   // Switch / sync logic
   const tick = useCallback(async () => {
     if (!userStarted) return;
-    const playlistAudio = playlistRef.current!;
-    const liveAudio = liveRef.current!;
+    if (tickingRef.current) return; // re-entry guard
+    tickingRef.current = true;
+    try {
+      const playlistAudio = playlistRef.current!;
+      const liveAudio = liveRef.current!;
 
-    const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks);
-    const { active, offsetSec, autoDj } = resolved;
+      const now = serverNow();
+      const resolved = resolveActiveProgram(programs, now, tracks, folders);
+      const { active, offsetSec, autoDj } = resolved;
 
-    let driftCorrection = 0;
+      let driftCorrection = 0;
 
-    // ---- 1. LIVE program -------------------------------------------------
-    if (active && active.type === "live") {
-      const key = `prog:${active.id}`;
-      if (currentKey.current !== key) {
-        if (!playlistAudio.paused) {
-          await fade(playlistAudio, 0, FADE_MS);
-          playlistAudio.pause();
+      // ---- 1. LIVE program -------------------------------------------------
+      if (active && active.type === "live") {
+        const key = `prog:${active.id}`;
+        if (currentKey.current !== key) {
+          if (!playlistAudio.paused) {
+            await fade(playlistAudio, 0, FADE_MS);
+            playlistAudio.pause();
+          }
+          liveAudio.src = active.stream_url ?? "";
+          liveAudio.volume = 0;
+          try {
+            await liveAudio.play();
+            await fade(liveAudio, 1, FADE_MS);
+            currentKey.current = key;
+          } catch (err) {
+            console.warn("[engine] live stream failed", err);
+            setState((s) => ({ ...s, error: "Flux direct indisponible", source: "silence", currentTitle: null }));
+            return;
+          }
         }
-        liveAudio.src = active.stream_url ?? "";
-        liveAudio.volume = 0;
-        try {
-          await liveAudio.play();
-          await fade(liveAudio, 1, FADE_MS);
-          currentKey.current = key;
-        } catch (err) {
-          console.warn("[engine] live stream failed", err);
-          setState((s) => ({ ...s, error: "Flux direct indisponible", source: "silence", currentTitle: null }));
-          return;
-        }
-      }
-      // NB: NO offset applied to live — stream is real-time
-      setState({
-        ...resolved,
-        isPlaying: true,
-        isReady: true,
-        error: null,
-        driftCorrectionSec: 0,
-        source: "program",
-        currentTitle: active.title || "Émission en direct",
-      });
-      return;
-    }
-
-    // ---- 2. Playlist or Jingle program (file-based) ---------------------
-    if (active && (active.type === "playlist" || active.type === "jingle")) {
-      const key = `prog:${active.id}`;
-      const audioUrl = active.audio_url ?? "";
-      const switched = currentKey.current !== key;
-
-      if (!liveAudio.paused) {
-        await fade(liveAudio, 0, FADE_MS);
-        liveAudio.pause();
+        setState({
+          ...resolved,
+          isPlaying: true,
+          isReady: true,
+          error: null,
+          driftCorrectionSec: 0,
+          source: "program",
+          currentTitle: active.title || "Émission en direct",
+        });
+        return;
       }
 
-      if (switched) {
-        try {
-          playlistAudio.src = audioUrl;
-          playlistAudio.volume = 0;
-          await new Promise<void>((res, rej) => {
-            const onLoaded = () => { cleanup(); res(); };
-            const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-            const cleanup = () => {
-              playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-              playlistAudio.removeEventListener("error", onErr);
-            };
-            playlistAudio.addEventListener("loadedmetadata", onLoaded);
-            playlistAudio.addEventListener("error", onErr);
-            playlistAudio.load();
-          });
-          const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-            ? playlistAudio.duration : null;
-          // Jingle = play once from start; Playlist = loop with offset
-          const target = active.type === "jingle"
-            ? Math.min(offsetSec, dur ?? offsetSec)
-            : (dur ? offsetSec % dur : offsetSec);
-          playlistAudio.currentTime = Math.max(0, target);
-          await playlistAudio.play();
-          await fade(playlistAudio, 1, FADE_MS);
-          currentKey.current = key;
-        } catch (err) {
-          console.warn("[engine] playlist load failed", err);
-          setState((s) => ({ ...s, error: "Audio indisponible", source: "silence", currentTitle: null }));
-          currentKey.current = null;
-          return;
+      // ---- 2. Playlist or Jingle program (file-based) ---------------------
+      if (active && (active.type === "playlist" || active.type === "jingle")) {
+        const key = `prog:${active.id}`;
+        const audioUrl = active.audio_url ?? "";
+        const switched = currentKey.current !== key;
+
+        if (!liveAudio.paused) {
+          await fade(liveAudio, 0, FADE_MS);
+          liveAudio.pause();
         }
-      } else {
-        // Drift correction (skip for jingles — they play through once)
-        if (active.type === "playlist") {
+
+        if (switched) {
+          try {
+            playlistAudio.src = audioUrl;
+            playlistAudio.volume = 0;
+            await new Promise<void>((res, rej) => {
+              const onLoaded = () => { cleanup(); res(); };
+              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
+              const cleanup = () => {
+                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
+                playlistAudio.removeEventListener("error", onErr);
+              };
+              playlistAudio.addEventListener("loadedmetadata", onLoaded);
+              playlistAudio.addEventListener("error", onErr);
+              playlistAudio.load();
+            });
+            const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
+              ? playlistAudio.duration : null;
+            const target = active.type === "jingle"
+              ? Math.min(offsetSec, dur ?? offsetSec)
+              : (dur ? offsetSec % dur : offsetSec);
+            playlistAudio.currentTime = Math.max(0, target);
+            await playlistAudio.play();
+            await fade(playlistAudio, 1, FADE_MS);
+            currentKey.current = key;
+          } catch (err) {
+            console.warn("[engine] playlist load failed", err);
+            setState((s) => ({ ...s, error: "Audio indisponible", source: "silence", currentTitle: null }));
+            currentKey.current = null;
+            return;
+          }
+        } else if (active.type === "playlist") {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
             ? playlistAudio.duration : null;
           const target = dur ? offsetSec % dur : offsetSec;
@@ -226,102 +259,139 @@ export function useRadioEngine(slug: string) {
             driftCorrection = diff;
           }
         }
+
+        setState({
+          ...resolved,
+          isPlaying: true,
+          isReady: true,
+          error: null,
+          driftCorrectionSec: driftCorrection,
+          source: "program",
+          currentTitle: active.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
+        });
+        return;
       }
 
-      setState({
-        ...resolved,
-        isPlaying: true,
-        isReady: true,
-        error: null,
-        driftCorrectionSec: driftCorrection,
-        source: "program",
-        currentTitle: active.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
-      });
-      return;
-    }
-
-    // ---- 3. Auto DJ fallback --------------------------------------------
-    if (autoDj && autoDj.track) {
-      const track = autoDj.track;
-      const key = `track:${track.id}`;
-      if (!liveAudio.paused) {
-        await fade(liveAudio, 0, FADE_MS);
-        liveAudio.pause();
-      }
-      const switched = currentKey.current !== key;
-      if (switched) {
-        try {
-          playlistAudio.src = track.audio_url;
-          playlistAudio.volume = 0;
-          await new Promise<void>((res, rej) => {
-            const onLoaded = () => { cleanup(); res(); };
-            const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
-            const cleanup = () => {
-              playlistAudio.removeEventListener("loadedmetadata", onLoaded);
-              playlistAudio.removeEventListener("error", onErr);
-            };
-            playlistAudio.addEventListener("loadedmetadata", onLoaded);
-            playlistAudio.addEventListener("error", onErr);
-            playlistAudio.load();
-          });
+      // ---- 3. Auto DJ fallback --------------------------------------------
+      if (autoDj && autoDj.track) {
+        const track = autoDj.track;
+        const key = `track:${track.id}`;
+        if (!liveAudio.paused) {
+          await fade(liveAudio, 0, FADE_MS);
+          liveAudio.pause();
+        }
+        const switched = currentKey.current !== key;
+        if (switched) {
+          try {
+            playlistAudio.src = track.audio_url;
+            playlistAudio.volume = 0;
+            await new Promise<void>((res, rej) => {
+              const onLoaded = () => { cleanup(); res(); };
+              const onErr = () => { cleanup(); rej(new Error("audio load failed")); };
+              const cleanup = () => {
+                playlistAudio.removeEventListener("loadedmetadata", onLoaded);
+                playlistAudio.removeEventListener("error", onErr);
+              };
+              playlistAudio.addEventListener("loadedmetadata", onLoaded);
+              playlistAudio.addEventListener("error", onErr);
+              playlistAudio.load();
+            });
+            const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
+              ? playlistAudio.duration : (track.duration_seconds ?? 0);
+            const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
+            playlistAudio.currentTime = Math.max(0, target);
+            await playlistAudio.play();
+            await fade(playlistAudio, 1, FADE_MS);
+            currentKey.current = key;
+          } catch (err) {
+            console.warn("[engine] autodj load failed", err);
+            setState((s) => ({ ...s, error: "Auto DJ indisponible", source: "silence", currentTitle: null }));
+            currentKey.current = null;
+            return;
+          }
+        } else {
           const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-            ? playlistAudio.duration : (track.duration_seconds ?? 0);
-          const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
-          playlistAudio.currentTime = Math.max(0, target);
-          await playlistAudio.play();
-          await fade(playlistAudio, 1, FADE_MS);
-          currentKey.current = key;
-        } catch (err) {
-          console.warn("[engine] autodj load failed", err);
-          setState((s) => ({ ...s, error: "Auto DJ indisponible", source: "silence", currentTitle: null }));
-          currentKey.current = null;
-          return;
+            ? playlistAudio.duration : null;
+          // If the audio element has stopped (e.g. paused by OS) restart it.
+          if (playlistAudio.paused) {
+            try { await playlistAudio.play(); } catch { /* needs gesture */ }
+          }
+          const target = dur ? autoDj.offsetSec : autoDj.offsetSec;
+          const diff = target - playlistAudio.currentTime;
+          if (Math.abs(diff) > DRIFT_TOLERANCE_SEC) {
+            playlistAudio.currentTime = Math.max(0, target);
+            driftCorrection = diff;
+          }
         }
-      } else {
-        // Drift correction within the current track
-        const dur = isFinite(playlistAudio.duration) && playlistAudio.duration > 0
-          ? playlistAudio.duration : null;
-        const target = dur ? autoDj.offsetSec : autoDj.offsetSec;
-        const diff = target - playlistAudio.currentTime;
-        if (Math.abs(diff) > DRIFT_TOLERANCE_SEC) {
-          playlistAudio.currentTime = Math.max(0, target);
-          driftCorrection = diff;
-        }
+
+        setState({
+          ...resolved,
+          isPlaying: true,
+          isReady: true,
+          error: null,
+          driftCorrectionSec: driftCorrection,
+          source: "autodj",
+          currentTitle: track.title,
+        });
+        return;
       }
 
+      // ---- 4. True silence -------------------------------------------------
+      if (!playlistAudio.paused) await fade(playlistAudio, 0, FADE_MS).then(() => playlistAudio.pause());
+      if (!liveAudio.paused) await fade(liveAudio, 0, FADE_MS).then(() => liveAudio.pause());
+      currentKey.current = null;
       setState({
         ...resolved,
-        isPlaying: true,
+        isPlaying: false,
         isReady: true,
         error: null,
-        driftCorrectionSec: driftCorrection,
-        source: "autodj",
-        currentTitle: track.title,
+        driftCorrectionSec: 0,
+        source: "silence",
+        currentTitle: null,
       });
-      return;
+    } finally {
+      tickingRef.current = false;
     }
+  }, [programs, tracks, folders, userStarted]);
 
-    // ---- 4. True silence -------------------------------------------------
-    if (!playlistAudio.paused) await fade(playlistAudio, 0, FADE_MS).then(() => playlistAudio.pause());
-    if (!liveAudio.paused) await fade(liveAudio, 0, FADE_MS).then(() => liveAudio.pause());
-    currentKey.current = null;
-    setState({
-      ...resolved,
-      isPlaying: false,
-      isReady: true,
-      error: null,
-      driftCorrectionSec: 0,
-      source: "silence",
-      currentTitle: null,
-    });
-  }, [programs, tracks, userStarted]);
+  // Keep latest tick fn in a ref so the audio "ended" listener can call it.
+  useEffect(() => { tickFnRef.current = tick; }, [tick]);
 
+  // Web Worker ticker — survives tab backgrounding / screen sleep.
   useEffect(() => {
     if (!userStarted) return;
     tick();
-    const id = setInterval(tick, RESYNC_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [tick, userStarted]);
+    const worker = createTickerWorker(RESYNC_INTERVAL_MS);
+    worker.onmessage = () => { tickFnRef.current?.().catch(() => {}); };
+    worker.postMessage("start");
+
+    // Re-tick instantly when tab becomes visible again (snap any drift).
+    const onVis = () => {
+      if (document.visibilityState === "visible") tickFnRef.current?.().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      worker.postMessage("stop");
+      worker.terminate();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [userStarted, tick]);
+
+  // MediaSession — tells the OS this page is playing audio so it isn't
+  // suspended. Required for Android Chrome / iOS Safari background audio.
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    if (!state.currentTitle) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: state.currentTitle,
+        artist: slug,
+        album: "Radio",
+      });
+      navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
+    } catch { /* ignore */ }
+  }, [state.currentTitle, state.isPlaying, slug]);
 
   // Light heartbeat for the UI clock even before the user starts playback
   const [, setHeartbeat] = useState(0);
@@ -332,9 +402,9 @@ export function useRadioEngine(slug: string) {
   useEffect(() => {
     if (programs.length === 0 && tracks.length === 0) return;
     const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks);
+    const resolved = resolveActiveProgram(programs, now, tracks, folders);
     setState((s) => ({ ...s, ...resolved }));
-  }, [programs, tracks]);
+  }, [programs, tracks, folders]);
 
   const start = useCallback(async () => {
     await syncServerTime();
@@ -349,5 +419,5 @@ export function useRadioEngine(slug: string) {
     setState((s) => ({ ...s, isPlaying: false, source: "silence" }));
   }, []);
 
-  return { state, programs, tracks, start, stop, userStarted };
+  return { state, programs, tracks, folders, start, stop, userStarted };
 }
