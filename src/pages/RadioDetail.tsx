@@ -61,6 +61,18 @@ const RadioDetail = () => {
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const reorderTracks = (from: number, to: number) => {
+    setForm((f) => {
+      if (from === to || from < 0 || to < 0 || from >= f.audioTrackIds.length || to >= f.audioTrackIds.length) return f;
+      const a = [...f.audioTrackIds];
+      const [moved] = a.splice(from, 1);
+      a.splice(to, 0, moved);
+      return { ...f, audioTrackIds: a };
+    });
+  };
 
   const [embedAutoplay, setEmbedAutoplay] = useState<boolean>(() => {
     try { return localStorage.getItem("ir.embed.autoplay") === "1"; } catch { return false; }
