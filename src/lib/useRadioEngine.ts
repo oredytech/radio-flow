@@ -235,14 +235,14 @@ export function useRadioEngine(slug: string) {
         const key = `prog:${active.id}`;
         if (currentKey.current !== key) {
           if (!playlistAudio.paused) {
-            await fade(playlistAudio, 0, FADE_MS);
+            await fade(playlistAudio, 0, fadeMsRef.current);
             playlistAudio.pause();
           }
           liveAudio.src = active.stream_url ?? "";
           liveAudio.volume = 0;
           try {
             await liveAudio.play();
-            await fade(liveAudio, 1, FADE_MS);
+            await fade(liveAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] live stream failed", err);
@@ -274,7 +274,7 @@ export function useRadioEngine(slug: string) {
         const switched = currentKey.current !== key;
 
         if (!liveAudio.paused) {
-          await fade(liveAudio, 0, FADE_MS);
+          await fade(liveAudio, 0, fadeMsRef.current);
           liveAudio.pause();
         }
 
@@ -290,7 +290,7 @@ export function useRadioEngine(slug: string) {
               : scheduledAudio.offsetSec;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
-            await fade(playlistAudio, 1, FADE_MS);
+            await fade(playlistAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] playlist load failed", err);
@@ -331,7 +331,7 @@ export function useRadioEngine(slug: string) {
         const track = autoDj.track;
         const key = `track:${track.id}`;
         if (!liveAudio.paused) {
-          await fade(liveAudio, 0, FADE_MS);
+          await fade(liveAudio, 0, fadeMsRef.current);
           liveAudio.pause();
         }
         const switched = currentKey.current !== key;
@@ -345,7 +345,7 @@ export function useRadioEngine(slug: string) {
             const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
-            await fade(playlistAudio, 1, FADE_MS);
+            await fade(playlistAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] autodj load failed", err);
@@ -386,8 +386,8 @@ export function useRadioEngine(slug: string) {
       }
 
       // ---- 4. True silence -------------------------------------------------
-      if (!playlistAudio.paused) await fade(playlistAudio, 0, FADE_MS).then(() => playlistAudio.pause());
-      if (!liveAudio.paused) await fade(liveAudio, 0, FADE_MS).then(() => liveAudio.pause());
+      if (!playlistAudio.paused) await fade(playlistAudio, 0, fadeMsRef.current).then(() => playlistAudio.pause());
+      if (!liveAudio.paused) await fade(liveAudio, 0, fadeMsRef.current).then(() => liveAudio.pause());
       currentKey.current = null;
       setState({
         ...resolved,
