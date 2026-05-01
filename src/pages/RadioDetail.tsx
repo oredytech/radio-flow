@@ -89,6 +89,15 @@ const RadioDetail = () => {
   const embedUrl = `${window.location.origin}/embed/${radio?.slug ?? ""}${embedAutoplay ? "?autoplay=1" : ""}`;
   const embedSnippet = `<iframe src="${embedUrl}" width="100%" height="120" frameborder="0" allow="autoplay"></iframe>`;
   const publicUrl = `${window.location.origin}/radio/${radio?.slug ?? ""}`;
+  const supaFnBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream`;
+  const streamM3U8 = radio ? `${supaFnBase}/${radio.slug}.m3u8` : "";
+  const streamPLS = radio ? `${supaFnBase}/${radio.slug}.pls` : "";
+  const streamM3U = radio ? `${supaFnBase}/${radio.slug}.m3u` : "";
+
+  const copyText = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(`${label} copié`); }
+    catch { toast.error("Copie impossible"); }
+  };
 
   const copyEmbed = async () => {
     await navigator.clipboard.writeText(embedSnippet);
