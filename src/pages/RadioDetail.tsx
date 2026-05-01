@@ -89,6 +89,15 @@ const RadioDetail = () => {
   const embedUrl = `${window.location.origin}/embed/${radio?.slug ?? ""}${embedAutoplay ? "?autoplay=1" : ""}`;
   const embedSnippet = `<iframe src="${embedUrl}" width="100%" height="120" frameborder="0" allow="autoplay"></iframe>`;
   const publicUrl = `${window.location.origin}/radio/${radio?.slug ?? ""}`;
+  const supaFnBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream`;
+  const streamM3U8 = radio ? `${supaFnBase}/${radio.slug}.m3u8` : "";
+  const streamPLS = radio ? `${supaFnBase}/${radio.slug}.pls` : "";
+  const streamM3U = radio ? `${supaFnBase}/${radio.slug}.m3u` : "";
+
+  const copyText = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(`${label} copié`); }
+    catch { toast.error("Copie impossible"); }
+  };
 
   const copyEmbed = async () => {
     await navigator.clipboard.writeText(embedSnippet);
@@ -501,6 +510,31 @@ const RadioDetail = () => {
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Partagez ce lien : tous les auditeurs entendront la même chose au même moment.
               </p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-gradient-card p-4">
+              <div className="mb-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">Flux 24/7</div>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Liens de flux continu — utilisables dans VLC, lecteurs mobiles, autoradios connectés, sites tiers. Le serveur diffuse 24h/24 ce qui est en antenne (programme ou Auto DJ).
+              </p>
+
+              {([
+                { label: "HLS (.m3u8) — web/mobile", url: streamM3U8 },
+                { label: "PLS (.pls) — VLC, players classiques", url: streamPLS },
+                { label: "M3U (.m3u) — universel", url: streamM3U },
+              ] as const).map((s) => (
+                <div key={s.label} className="mb-3 last:mb-0">
+                  <div className="mb-1 text-[11px] font-semibold text-foreground/80">{s.label}</div>
+                  <a href={s.url} target="_blank" rel="noreferrer"
+                     className="block break-all rounded-md bg-background p-2 text-[11px] text-primary hover:underline">
+                    {s.url}
+                  </a>
+                  <Button variant="outline" size="sm" className="mt-1.5 w-full"
+                          onClick={() => copyText(s.url, s.label.split(" —")[0])}>
+                    <Copy className="mr-1.5 h-3.5 w-3.5" /> Copier
+                  </Button>
+                </div>
+              ))}
             </div>
 
             <div className="rounded-xl border border-border bg-gradient-card p-4">
