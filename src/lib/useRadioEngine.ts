@@ -477,5 +477,5 @@ export function useRadioEngine(slug: string) {
     setState((s) => ({ ...s, isPlaying: false, source: "silence" }));
   }, []);
 
-  return { state, programs, tracks, folders, start, stop, userStarted };
+  return { state, programs, tracks, folders, start, stop, userStarted, fadeMs, setFadeMs };
 }
