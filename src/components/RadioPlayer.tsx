@@ -22,7 +22,7 @@ export function RadioPlayer({
   slug, radioName, theme = "dark", minimal = false, autoplay = false,
   showInternalSource = false,
 }: RadioPlayerProps) {
-  const { state, start, stop, userStarted } = useRadioEngine(slug);
+  const { state, start, stop, userStarted, fadeMs, setFadeMs } = useRadioEngine(slug);
   const [autoTried, setAutoTried] = useState(false);
 
   useEffect(() => {
