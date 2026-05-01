@@ -12,8 +12,19 @@ import {
 
 const DRIFT_TOLERANCE_SEC = 1.2;
 const RESYNC_INTERVAL_MS = 1000;
-const FADE_MS = 600;
 const NEAR_END_GUARD_SEC = 1.4;
+const DEFAULT_FADE_MS = 1500;
+const FADE_STORAGE_KEY = "ir.engine.fadeMs";
+
+function getStoredFadeMs(): number {
+  try {
+    const raw = localStorage.getItem(FADE_STORAGE_KEY);
+    if (!raw) return DEFAULT_FADE_MS;
+    const n = parseInt(raw, 10);
+    if (!isFinite(n) || n < 100 || n > 8000) return DEFAULT_FADE_MS;
+    return n;
+  } catch { return DEFAULT_FADE_MS; }
+}
 
 export interface EngineState extends ResolvedState {
   isPlaying: boolean;
