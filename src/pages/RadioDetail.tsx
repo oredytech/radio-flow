@@ -513,6 +513,31 @@ const RadioDetail = () => {
             </div>
 
             <div className="rounded-xl border border-border bg-gradient-card p-4">
+              <div className="mb-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">Flux 24/7</div>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Liens de flux continu — utilisables dans VLC, lecteurs mobiles, autoradios connectés, sites tiers. Le serveur diffuse 24h/24 ce qui est en antenne (programme ou Auto DJ).
+              </p>
+
+              {([
+                { label: "HLS (.m3u8) — web/mobile", url: streamM3U8 },
+                { label: "PLS (.pls) — VLC, players classiques", url: streamPLS },
+                { label: "M3U (.m3u) — universel", url: streamM3U },
+              ] as const).map((s) => (
+                <div key={s.label} className="mb-3 last:mb-0">
+                  <div className="mb-1 text-[11px] font-semibold text-foreground/80">{s.label}</div>
+                  <a href={s.url} target="_blank" rel="noreferrer"
+                     className="block break-all rounded-md bg-background p-2 text-[11px] text-primary hover:underline">
+                    {s.url}
+                  </a>
+                  <Button variant="outline" size="sm" className="mt-1.5 w-full"
+                          onClick={() => copyText(s.url, s.label.split(" —")[0])}>
+                    <Copy className="mr-1.5 h-3.5 w-3.5" /> Copier
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-border bg-gradient-card p-4">
               <div className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Code d'intégration</div>
 
               <label className="mb-3 flex cursor-pointer items-center justify-between rounded-md border border-border bg-background/50 p-2.5 text-xs">
