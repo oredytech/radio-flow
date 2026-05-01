@@ -119,12 +119,21 @@ export function useRadioEngine(slug: string) {
     currentTitle: null,
   });
   const [userStarted, setUserStarted] = useState(false);
+  const [fadeMs, setFadeMsState] = useState<number>(() => getStoredFadeMs());
 
   const playlistRef = useRef<HTMLAudioElement | null>(null);
   const liveRef = useRef<HTMLAudioElement | null>(null);
   const currentKey = useRef<CurrentSourceKey>(null);
   const tickingRef = useRef(false);
   const tickFnRef = useRef<() => Promise<void>>();
+  const fadeMsRef = useRef<number>(fadeMs);
+  useEffect(() => { fadeMsRef.current = fadeMs; }, [fadeMs]);
+
+  const setFadeMs = useCallback((ms: number) => {
+    const clamped = Math.max(100, Math.min(8000, Math.round(ms)));
+    setFadeMsState(clamped);
+    try { localStorage.setItem(FADE_STORAGE_KEY, String(clamped)); } catch { /* ignore */ }
+  }, []);
 
   // Lazy create audio elements
   useEffect(() => {
