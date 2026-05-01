@@ -22,7 +22,7 @@ export function RadioPlayer({
   slug, radioName, theme = "dark", minimal = false, autoplay = false,
   showInternalSource = false,
 }: RadioPlayerProps) {
-  const { state, start, stop, userStarted } = useRadioEngine(slug);
+  const { state, start, stop, userStarted, fadeMs, setFadeMs } = useRadioEngine(slug);
   const [autoTried, setAutoTried] = useState(false);
 
   useEffect(() => {
@@ -134,10 +134,22 @@ export function RadioPlayer({
       </div>
 
       {!minimal && (
-        <div className="relative z-10 hidden sm:flex flex-col items-end text-right">
+        <div className="relative z-10 hidden sm:flex flex-col items-end text-right gap-1">
           <RadioIcon className="h-5 w-5 text-primary" />
           {state.error && state.error !== "Radio not found" && (
             <span className="mt-1 text-[10px] text-destructive">{state.error}</span>
+          )}
+          {showInternalSource && (
+            <label className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground" title="Durée du fondu enchaîné entre pistes/programmes">
+              <span className="uppercase tracking-wider">Fondu</span>
+              <input
+                type="range" min={300} max={5000} step={100}
+                value={fadeMs}
+                onChange={(e) => setFadeMs(parseInt(e.target.value, 10))}
+                className="w-20 accent-[hsl(var(--primary))] cursor-pointer"
+              />
+              <span className="tabular-nums">{(fadeMs / 1000).toFixed(1)}s</span>
+            </label>
           )}
         </div>
       )}

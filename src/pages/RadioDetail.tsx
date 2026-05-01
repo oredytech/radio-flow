@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, Pencil, AlertTriangle, Share2, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
 import { DAY_LABELS, findOverlaps, overlapsExisting } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
 
 type RadioRow = Tables<"radios">;
@@ -61,6 +62,18 @@ const RadioDetail = () => {
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const reorderTracks = (from: number, to: number) => {
+    setForm((f) => {
+      if (from === to || from < 0 || to < 0 || from >= f.audioTrackIds.length || to >= f.audioTrackIds.length) return f;
+      const a = [...f.audioTrackIds];
+      const [moved] = a.splice(from, 1);
+      a.splice(to, 0, moved);
+      return { ...f, audioTrackIds: a };
+    });
+  };
 
   const [embedAutoplay, setEmbedAutoplay] = useState<boolean>(() => {
     try { return localStorage.getItem("ir.embed.autoplay") === "1"; } catch { return false; }
@@ -390,11 +403,26 @@ const RadioDetail = () => {
                                   </Select>
                                   {selectedTracks.length > 0 && (
                                     <div className="space-y-1.5 rounded-md border border-border bg-background/50 p-2">
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Glissez pour réordonner</p>
                                       {selectedTracks.map((t, idx) => (
-                                        <div key={`${t.id}-${idx}`} className="flex min-w-0 items-center gap-1.5 rounded border border-border/60 px-2 py-1.5 text-xs">
+                                        <div
+                                          key={`${t.id}-${idx}`}
+                                          draggable
+                                          onDragStart={(e) => { setDragIdx(idx); e.dataTransfer.effectAllowed = "move"; }}
+                                          onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverIdx !== idx) setDragOverIdx(idx); }}
+                                          onDragLeave={() => { if (dragOverIdx === idx) setDragOverIdx(null); }}
+                                          onDrop={(e) => { e.preventDefault(); if (dragIdx !== null) reorderTracks(dragIdx, idx); setDragIdx(null); setDragOverIdx(null); }}
+                                          className={cn(
+                                            "flex min-w-0 items-center gap-1.5 rounded border px-2 py-1.5 text-xs transition-colors",
+                                            dragIdx === idx ? "opacity-40 border-primary" : "border-border/60",
+                                            dragOverIdx === idx && dragIdx !== idx ? "border-primary bg-primary/5" : "",
+                                          )}
+                                        >
+                                          <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
                                           <span className="min-w-0 flex-1 truncate">{idx + 1}. {t.title}</span>
-                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; return { ...f, audioTrackIds: a }; })}><ArrowUp className="h-3.5 w-3.5" /></Button>
-                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === selectedTracks.length - 1} onClick={() => setForm((f) => { const a = [...f.audioTrackIds]; [a[idx + 1], a[idx]] = [a[idx], a[idx + 1]]; return { ...f, audioTrackIds: a }; })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => reorderTracks(idx, idx - 1)}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === selectedTracks.length - 1} onClick={() => reorderTracks(idx, idx + 1)}><ArrowDown className="h-3.5 w-3.5" /></Button>
                                           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setForm((f) => ({ ...f, audioTrackIds: f.audioTrackIds.filter((_, i) => i !== idx) }))}><Trash2 className="h-3.5 w-3.5" /></Button>
                                         </div>
                                       ))}

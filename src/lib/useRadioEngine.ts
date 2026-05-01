@@ -12,8 +12,19 @@ import {
 
 const DRIFT_TOLERANCE_SEC = 1.2;
 const RESYNC_INTERVAL_MS = 1000;
-const FADE_MS = 600;
 const NEAR_END_GUARD_SEC = 1.4;
+const DEFAULT_FADE_MS = 1500;
+const FADE_STORAGE_KEY = "ir.engine.fadeMs";
+
+function getStoredFadeMs(): number {
+  try {
+    const raw = localStorage.getItem(FADE_STORAGE_KEY);
+    if (!raw) return DEFAULT_FADE_MS;
+    const n = parseInt(raw, 10);
+    if (!isFinite(n) || n < 100 || n > 8000) return DEFAULT_FADE_MS;
+    return n;
+  } catch { return DEFAULT_FADE_MS; }
+}
 
 export interface EngineState extends ResolvedState {
   isPlaying: boolean;
@@ -108,12 +119,21 @@ export function useRadioEngine(slug: string) {
     currentTitle: null,
   });
   const [userStarted, setUserStarted] = useState(false);
+  const [fadeMs, setFadeMsState] = useState<number>(() => getStoredFadeMs());
 
   const playlistRef = useRef<HTMLAudioElement | null>(null);
   const liveRef = useRef<HTMLAudioElement | null>(null);
   const currentKey = useRef<CurrentSourceKey>(null);
   const tickingRef = useRef(false);
   const tickFnRef = useRef<() => Promise<void>>();
+  const fadeMsRef = useRef<number>(fadeMs);
+  useEffect(() => { fadeMsRef.current = fadeMs; }, [fadeMs]);
+
+  const setFadeMs = useCallback((ms: number) => {
+    const clamped = Math.max(100, Math.min(8000, Math.round(ms)));
+    setFadeMsState(clamped);
+    try { localStorage.setItem(FADE_STORAGE_KEY, String(clamped)); } catch { /* ignore */ }
+  }, []);
 
   // Lazy create audio elements
   useEffect(() => {
@@ -224,14 +244,14 @@ export function useRadioEngine(slug: string) {
         const key = `prog:${active.id}`;
         if (currentKey.current !== key) {
           if (!playlistAudio.paused) {
-            await fade(playlistAudio, 0, FADE_MS);
+            await fade(playlistAudio, 0, fadeMsRef.current);
             playlistAudio.pause();
           }
           liveAudio.src = active.stream_url ?? "";
           liveAudio.volume = 0;
           try {
             await liveAudio.play();
-            await fade(liveAudio, 1, FADE_MS);
+            await fade(liveAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] live stream failed", err);
@@ -263,7 +283,7 @@ export function useRadioEngine(slug: string) {
         const switched = currentKey.current !== key;
 
         if (!liveAudio.paused) {
-          await fade(liveAudio, 0, FADE_MS);
+          await fade(liveAudio, 0, fadeMsRef.current);
           liveAudio.pause();
         }
 
@@ -279,7 +299,7 @@ export function useRadioEngine(slug: string) {
               : scheduledAudio.offsetSec;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
-            await fade(playlistAudio, 1, FADE_MS);
+            await fade(playlistAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] playlist load failed", err);
@@ -320,7 +340,7 @@ export function useRadioEngine(slug: string) {
         const track = autoDj.track;
         const key = `track:${track.id}`;
         if (!liveAudio.paused) {
-          await fade(liveAudio, 0, FADE_MS);
+          await fade(liveAudio, 0, fadeMsRef.current);
           liveAudio.pause();
         }
         const switched = currentKey.current !== key;
@@ -334,7 +354,7 @@ export function useRadioEngine(slug: string) {
             const target = dur > 0 ? Math.min(autoDj.offsetSec, dur - 0.1) : 0;
             playlistAudio.currentTime = Math.max(0, target);
             await playlistAudio.play();
-            await fade(playlistAudio, 1, FADE_MS);
+            await fade(playlistAudio, 1, fadeMsRef.current);
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] autodj load failed", err);
@@ -375,8 +395,8 @@ export function useRadioEngine(slug: string) {
       }
 
       // ---- 4. True silence -------------------------------------------------
-      if (!playlistAudio.paused) await fade(playlistAudio, 0, FADE_MS).then(() => playlistAudio.pause());
-      if (!liveAudio.paused) await fade(liveAudio, 0, FADE_MS).then(() => liveAudio.pause());
+      if (!playlistAudio.paused) await fade(playlistAudio, 0, fadeMsRef.current).then(() => playlistAudio.pause());
+      if (!liveAudio.paused) await fade(liveAudio, 0, fadeMsRef.current).then(() => liveAudio.pause());
       currentKey.current = null;
       setState({
         ...resolved,
@@ -457,5 +477,5 @@ export function useRadioEngine(slug: string) {
     setState((s) => ({ ...s, isPlaying: false, source: "silence" }));
   }, []);
 
-  return { state, programs, tracks, folders, start, stop, userStarted };
+  return { state, programs, tracks, folders, start, stop, userStarted, fadeMs, setFadeMs };
 }
