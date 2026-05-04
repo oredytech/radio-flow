@@ -36,6 +36,8 @@ export interface EngineState extends ResolvedState {
   source: "program" | "autodj" | "silence";
   // Title shown in the UI ("Lecture en cours" / track title / live program title)
   currentTitle: string | null;
+  // ID of the track currently playing (for highlighting in the library), null if live/silence
+  currentTrackId: string | null;
 }
 
 function fade(audio: HTMLAudioElement, to: number, ms: number) {
