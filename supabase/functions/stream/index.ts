@@ -271,22 +271,30 @@ function buildQueue(
 }
 
 function buildM3U8(queue: QueueItem[], radioName: string): string {
-  // HLS Media Playlist — VOD-style sliding window. Players will reload it.
+  // HLS Media Playlist for raw MP3 segments. Each MP3 is a self-contained
+  // file with its own header/timestamps, so we MUST insert
+  // #EXT-X-DISCONTINUITY between them so the player resets its decoder and
+  // PTS clock. Without these tags Safari/hls.js play silence.
   const targetDur = Math.max(
     10,
     Math.ceil(queue.reduce((m, q) => Math.max(m, q.durationSec), 0)),
   );
   const lines: string[] = [
     "#EXTM3U",
-    "#EXT-X-VERSION:3",
+    "#EXT-X-VERSION:4",
     `#EXT-X-TARGETDURATION:${targetDur}`,
     "#EXT-X-MEDIA-SEQUENCE:0",
+    "#EXT-X-DISCONTINUITY-SEQUENCE:0",
     "#EXT-X-PLAYLIST-TYPE:EVENT",
+    "#EXT-X-INDEPENDENT-SEGMENTS",
     `#EXT-X-PROGRAM-DATE-TIME:${new Date().toISOString()}`,
     `# Radio: ${radioName}`,
   ];
-  for (const item of queue) {
-    lines.push(`#EXTINF:${item.durationSec.toFixed(3)},${item.title.replace(/[\\r\\n,]/g, " ")}`);
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i];
+    // Discontinuity before every segment (each MP3 has its own timestamp base).
+    lines.push("#EXT-X-DISCONTINUITY");
+    lines.push(`#EXTINF:${item.durationSec.toFixed(3)},${item.title.replace(/[\r\n,]/g, " ")}`);
     lines.push(item.url);
   }
   // Don't emit ENDLIST — the playlist is "live", players keep reloading.
