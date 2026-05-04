@@ -153,8 +153,11 @@ export function computeProgramAudio(program: Program, offsetSec: number, program
 
   const total = playable.reduce((sum, pt) => sum + (pt.track?.duration_seconds ?? 0), 0);
   if (total <= 0) return null;
-  const cursor = program.type === "jingle" ? offsetSec : offsetSec % total;
-  if (program.type === "jingle" && cursor >= total) return null;
+  // No looping: once all program tracks have played, return null so the engine
+  // falls back to Auto DJ for the remainder of the slot. Both jingle and
+  // playlist programs behave the same way in this regard.
+  const cursor = offsetSec;
+  if (cursor >= total) return null;
 
   let acc = 0;
   for (let i = 0; i < playable.length; i++) {
