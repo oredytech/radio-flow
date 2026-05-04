@@ -582,9 +582,21 @@ export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange, c
                   </div>
                 ) : (
                   <ul className="divide-y divide-border">
-                    {list.map((t, i) => (
-                      <li key={t.id} className="flex items-center gap-2 px-2 py-2 sm:px-4">
-                        <span className="w-5 shrink-0 text-center text-xs text-muted-foreground sm:w-6">{i + 1}</span>
+                    {list.map((t, i) => {
+                      const isPlaying = currentTrackId === t.id;
+                      return (
+                      <li key={t.id} className={`flex items-center gap-2 px-2 py-2 sm:px-4 transition-colors ${isPlaying ? "bg-primary/15 ring-1 ring-primary/40" : ""}`}>
+                        <span className="w-5 shrink-0 text-center text-xs sm:w-6">
+                          {isPlaying ? (
+                            <span className="inline-flex h-3 items-end gap-[1px]">
+                              <span className="equalizer-bar !w-[2px]" />
+                              <span className="equalizer-bar !w-[2px]" />
+                              <span className="equalizer-bar !w-[2px]" />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">{i + 1}</span>
+                          )}
+                        </span>
                         <div className="min-w-0 flex-1">
                           {editingTitleId === t.id ? (
                             <Input
