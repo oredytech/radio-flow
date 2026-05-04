@@ -306,7 +306,7 @@ function buildPLS(queue: QueueItem[], radioName: string): string {
   queue.forEach((q, i) => {
     const n = i + 1;
     lines.push(`File${n}=${q.url}`);
-    lines.push(`Title${n}=${radioName} — ${q.title.replace(/[\\r\\n]/g, " ")}`);
+    lines.push(`Title${n}=${radioName} — ${q.title.replace(/[\r\n]/g, " ")}`);
     lines.push(`Length${n}=${Math.max(1, Math.round(q.durationSec))}`);
   });
   lines.push("Version=2");
@@ -316,7 +316,7 @@ function buildPLS(queue: QueueItem[], radioName: string): string {
 function buildM3U(queue: QueueItem[], radioName: string): string {
   const lines = ["#EXTM3U", `# ${radioName}`];
   for (const q of queue) {
-    lines.push(`#EXTINF:${Math.max(1, Math.round(q.durationSec))},${radioName} — ${q.title.replace(/[\\r\\n,]/g, " ")}`);
+    lines.push(`#EXTINF:${Math.max(1, Math.round(q.durationSec))},${radioName} — ${q.title.replace(/[\r\n,]/g, " ")}`);
     lines.push(q.url);
   }
   return lines.join("\n") + "\n";
