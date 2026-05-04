@@ -27,6 +27,8 @@ interface Props {
   userId: string;
   tracks: Track[];
   onChange: (next: Track[]) => void;
+  /** ID of the track currently being broadcast — highlighted in the lists. */
+  currentTrackId?: string | null;
 }
 
 interface UploadItem {
@@ -113,7 +115,7 @@ const KIND_META: Record<Folder["kind"], { icon: typeof Disc3; label: string }> =
   custom: { icon: Folder, label: "Dossier" },
 };
 
-export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange }: Props) {
+export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange, currentTrackId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string>("");
