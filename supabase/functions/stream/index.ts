@@ -195,51 +195,52 @@ function buildQueue(
         continue;
       }
       if (ordered.length === 0 || total <= 0) {
-        // Nothing playable in this program → fall through to Auto DJ for the slot.
-        // (Don't break; just skip the program window.)
-        cursorMs = segmentEndMs;
-        continue;
-      }
-      // Where in the program are we?
-      const programStartSec = timeToSec(active.start_time);
-      const elapsedSec = sec - programStartSec;
-      const cursorInProgram = active.type === "jingle" ? elapsedSec : elapsedSec % total;
-      // Walk the program tracks until we hit the program end.
-      let inProg = cursorInProgram;
-      let segLeftMs = msUntilCut;
-      while (segLeftMs > 0 && queue.length < MAX_QUEUE_ITEMS) {
-        let acc = 0;
-        let chosen: { track: Track; offsetSec: number } | null = null;
-        for (const x of ordered) {
-          const dur = x.track.duration_seconds ?? 0;
-          if (inProg < acc + dur) {
-            chosen = { track: x.track, offsetSec: inProg - acc };
-            break;
+        // Nothing playable — fall through to Auto DJ for this slot below.
+      } else {
+        // Where in the program are we? No looping: once all tracks played,
+        // we let Auto DJ take over the remainder of the slot.
+        const programStartSec = timeToSec(active.start_time);
+        const elapsedSec = sec - programStartSec;
+        let inProg = elapsedSec; // no modulo — we want one-shot playback
+        let segLeftMs = msUntilCut;
+        let consumedAll = inProg >= total;
+        while (segLeftMs > 0 && !consumedAll && queue.length < MAX_QUEUE_ITEMS) {
+          let acc = 0;
+          let chosen: { track: Track; offsetSec: number } | null = null;
+          for (const x of ordered) {
+            const dur = x.track.duration_seconds ?? 0;
+            if (inProg < acc + dur) {
+              chosen = { track: x.track, offsetSec: inProg - acc };
+              break;
+            }
+            acc += dur;
           }
-          acc += dur;
+          if (!chosen) { consumedAll = true; break; }
+          const remainInTrack = (chosen.track.duration_seconds ?? 0) - chosen.offsetSec;
+          const dur = Math.max(1, Math.min(remainInTrack, segLeftMs / 1000));
+          queue.push({
+            url: chosen.track.audio_url,
+            title: `${active.title || "Programme"} — ${chosen.track.title}`,
+            durationSec: dur,
+            source: "program",
+          });
+          segLeftMs -= dur * 1000;
+          cursorMs += dur * 1000;
+          inProg += dur;
+          if (inProg >= total) consumedAll = true;
+          if (cursorMs >= horizonMs) break;
         }
-        if (!chosen) {
-          if (active.type === "jingle") break; // jingle ran out
-          inProg = 0; // loop
+        // If program tracks are all consumed but there's still slot time left,
+        // fall through to Auto DJ for the rest of the slot.
+        if (!consumedAll || cursorMs >= segmentEndMs) {
+          cursorMs = Math.max(cursorMs, segmentEndMs);
           continue;
         }
-        const remainInTrack = (chosen.track.duration_seconds ?? 0) - chosen.offsetSec;
-        const dur = Math.max(1, Math.min(remainInTrack, segLeftMs / 1000));
-        queue.push({
-          url: chosen.track.audio_url,
-          title: `${active.title || "Programme"} — ${chosen.track.title}`,
-          durationSec: dur,
-          source: "program",
-        });
-        segLeftMs -= dur * 1000;
-        inProg += dur;
-        if (cursorMs + dur * 1000 >= horizonMs) break;
+        // else: drop into Auto DJ branch below for remaining time.
       }
-      cursorMs = segmentEndMs;
-      continue;
     }
 
-    // No active program → Auto DJ until next transition (or horizon).
+    // No active program (or active program ran out) → Auto DJ until next transition.
     const segLimitMs = Math.min(segmentEndMs, horizonMs);
     let djCur = djCursorAt(cursorMs);
     if (!djCur) {
