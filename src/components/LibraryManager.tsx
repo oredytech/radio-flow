@@ -651,7 +651,8 @@ export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange, c
                           </Button>
                         </div>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 )}
               </div>
