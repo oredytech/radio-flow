@@ -72,14 +72,20 @@ async function loadTarget(targetId: string, userId: string): Promise<BroadcastTa
   return tgt as unknown as BroadcastTarget;
 }
 
-async function fetchInternalQueue(radioId: string): Promise<{ url: string; durationSec: number; title: string }[]> {
-  const url = `${SUPABASE_URL}/functions/v1/stream/${radioId}.json`;
+async function fetchInternalQueue(slug: string): Promise<{ url: string; durationSec: number; title: string }[]> {
+  const url = `${SUPABASE_URL}/functions/v1/stream/${encodeURIComponent(slug)}.json`;
   const r = await fetch(url, { headers: { apikey: ANON_KEY } });
   if (!r.ok) return [];
   try {
     const j = await r.json();
     return Array.isArray(j?.queue) ? j.queue : [];
   } catch { return []; }
+}
+
+async function radioSlug(radioId: string): Promise<string | null> {
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data } = await admin.from("radios").select("slug").eq("id", radioId).maybeSingle();
+  return (data as { slug?: string } | null)?.slug ?? null;
 }
 
 async function streamToIcecast(target: BroadcastTarget, abortSignal: AbortSignal): Promise<{ ok: boolean; error?: string; bytes: number }> {
