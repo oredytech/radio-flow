@@ -272,12 +272,10 @@ export function useRadioEngine(slug: string) {
       }
 
       // ---- 2. Playlist or Jingle program (file-based) ---------------------
-      if (active && (active.type === "playlist" || active.type === "jingle")) {
-        if (!scheduledAudio) {
-          currentKey.current = null;
-          setState((s) => ({ ...s, ...resolved, error: "Audio indisponible", source: "silence", currentTitle: null }));
-          return;
-        }
+      // If active program exists AND scheduledAudio is available, play it.
+      // If scheduledAudio is null, the program's tracks have all been played:
+      // fall through to Auto DJ for the remainder of the slot.
+      if (active && (active.type === "playlist" || active.type === "jingle") && scheduledAudio) {
         const key = scheduledAudio.key;
         const audioUrl = scheduledAudio.audioUrl;
         const switched = currentKey.current !== key;
