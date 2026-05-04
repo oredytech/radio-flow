@@ -36,6 +36,8 @@ export interface EngineState extends ResolvedState {
   source: "program" | "autodj" | "silence";
   // Title shown in the UI ("Lecture en cours" / track title / live program title)
   currentTitle: string | null;
+  // ID of the track currently playing (for highlighting in the library), null if live/silence
+  currentTrackId: string | null;
 }
 
 function fade(audio: HTMLAudioElement, to: number, ms: number) {
@@ -117,6 +119,7 @@ export function useRadioEngine(slug: string) {
     driftCorrectionSec: 0,
     source: "silence",
     currentTitle: null,
+    currentTrackId: null,
   });
   const [userStarted, setUserStarted] = useState(false);
   const [fadeMs, setFadeMsState] = useState<number>(() => getStoredFadeMs());
@@ -255,7 +258,7 @@ export function useRadioEngine(slug: string) {
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] live stream failed", err);
-            setState((s) => ({ ...s, error: "Flux direct indisponible", source: "silence", currentTitle: null }));
+            setState((s) => ({ ...s, error: "Flux direct indisponible", source: "silence", currentTitle: null, currentTrackId: null }));
             return;
           }
         }
@@ -267,6 +270,7 @@ export function useRadioEngine(slug: string) {
           driftCorrectionSec: 0,
           source: "program",
           currentTitle: active.title || "Émission en direct",
+          currentTrackId: null,
         });
         return;
       }
@@ -301,7 +305,7 @@ export function useRadioEngine(slug: string) {
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] playlist load failed", err);
-            setState((s) => ({ ...s, error: "Audio indisponible", source: "silence", currentTitle: null }));
+            setState((s) => ({ ...s, error: "Audio indisponible", source: "silence", currentTitle: null, currentTrackId: null }));
             currentKey.current = null;
             return;
           }
@@ -329,6 +333,7 @@ export function useRadioEngine(slug: string) {
           driftCorrectionSec: driftCorrection,
           source: "program",
           currentTitle: active.title || scheduledAudio.title || (active.type === "jingle" ? "Jingle" : "Lecture en cours"),
+          currentTrackId: scheduledAudio.track?.id ?? null,
         });
         return;
       }
@@ -356,7 +361,7 @@ export function useRadioEngine(slug: string) {
             currentKey.current = key;
           } catch (err) {
             console.warn("[engine] autodj load failed", err);
-            setState((s) => ({ ...s, error: "Auto DJ indisponible", source: "silence", currentTitle: null }));
+            setState((s) => ({ ...s, error: "Auto DJ indisponible", source: "silence", currentTitle: null, currentTrackId: null }));
             currentKey.current = null;
             return;
           }
@@ -388,6 +393,7 @@ export function useRadioEngine(slug: string) {
           driftCorrectionSec: driftCorrection,
           source: "autodj",
           currentTitle: track.title,
+          currentTrackId: track.id,
         });
         return;
       }
@@ -404,6 +410,7 @@ export function useRadioEngine(slug: string) {
         driftCorrectionSec: 0,
         source: "silence",
         currentTitle: null,
+        currentTrackId: null,
       });
     } finally {
       tickingRef.current = false;

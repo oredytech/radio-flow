@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      broadcast_targets: {
+        Row: {
+          bitrate_kbps: number
+          created_at: string
+          enabled: boolean
+          host: string
+          id: string
+          last_error: string | null
+          last_started_at: string | null
+          mount: string
+          name: string
+          password: string
+          port: number
+          protocol: string
+          radio_id: string
+          updated_at: string
+          use_tls: boolean
+          username: string
+        }
+        Insert: {
+          bitrate_kbps?: number
+          created_at?: string
+          enabled?: boolean
+          host: string
+          id?: string
+          last_error?: string | null
+          last_started_at?: string | null
+          mount?: string
+          name: string
+          password: string
+          port?: number
+          protocol?: string
+          radio_id: string
+          updated_at?: string
+          use_tls?: boolean
+          username?: string
+        }
+        Update: {
+          bitrate_kbps?: number
+          created_at?: string
+          enabled?: boolean
+          host?: string
+          id?: string
+          last_error?: string | null
+          last_started_at?: string | null
+          mount?: string
+          name?: string
+          password?: string
+          port?: number
+          protocol?: string
+          radio_id?: string
+          updated_at?: string
+          use_tls?: boolean
+          username?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

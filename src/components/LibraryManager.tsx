@@ -27,6 +27,8 @@ interface Props {
   userId: string;
   tracks: Track[];
   onChange: (next: Track[]) => void;
+  /** ID of the track currently being broadcast — highlighted in the lists. */
+  currentTrackId?: string | null;
 }
 
 interface UploadItem {
@@ -113,7 +115,7 @@ const KIND_META: Record<Folder["kind"], { icon: typeof Disc3; label: string }> =
   custom: { icon: Folder, label: "Dossier" },
 };
 
-export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange }: Props) {
+export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange, currentTrackId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string>("");
@@ -580,9 +582,21 @@ export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange }:
                   </div>
                 ) : (
                   <ul className="divide-y divide-border">
-                    {list.map((t, i) => (
-                      <li key={t.id} className="flex items-center gap-2 px-2 py-2 sm:px-4">
-                        <span className="w-5 shrink-0 text-center text-xs text-muted-foreground sm:w-6">{i + 1}</span>
+                    {list.map((t, i) => {
+                      const isPlaying = currentTrackId === t.id;
+                      return (
+                      <li key={t.id} className={`flex items-center gap-2 px-2 py-2 sm:px-4 transition-colors ${isPlaying ? "bg-primary/15 ring-1 ring-primary/40" : ""}`}>
+                        <span className="w-5 shrink-0 text-center text-xs sm:w-6">
+                          {isPlaying ? (
+                            <span className="inline-flex h-3 items-end gap-[1px]">
+                              <span className="equalizer-bar !w-[2px]" />
+                              <span className="equalizer-bar !w-[2px]" />
+                              <span className="equalizer-bar !w-[2px]" />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">{i + 1}</span>
+                          )}
+                        </span>
                         <div className="min-w-0 flex-1">
                           {editingTitleId === t.id ? (
                             <Input
@@ -637,7 +651,8 @@ export function LibraryManager({ radioId, radioSlug, userId, tracks, onChange }:
                           </Button>
                         </div>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 )}
               </div>
