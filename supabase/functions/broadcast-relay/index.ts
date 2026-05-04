@@ -105,10 +105,13 @@ async function streamToIcecast(target: BroadcastTarget, abortSignal: AbortSignal
     try { writer.close(); } catch { /* ignore */ }
   });
 
+  const slug = await radioSlug(target.radio_id);
+  if (!slug) return { ok: false, error: "Radio not found", bytes: 0 };
+
   // Producer: keep pulling the live queue and piping each segment.
   const producer = (async () => {
     while (!stopped) {
-      const queue = await fetchInternalQueue(target.radio_id);
+      const queue = await fetchInternalQueue(slug);
       if (queue.length === 0) {
         // nothing to play; write 1s of silence (minimal MP3 frame trick: just wait).
         await new Promise((r) => setTimeout(r, 1000));
