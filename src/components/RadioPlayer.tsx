@@ -105,7 +105,7 @@ export function RadioPlayer({
         <div className="mt-1 truncate text-sm sm:text-base font-semibold">
           {(() => {
             if (!userStarted) {
-              return state.active?.title || (state.active ? "Programme prêt" : (radioName || "Hors antenne"));
+              return state.active?.title || (state.active ? "Programme prêt" : (radioName ? `${radioName} · Auto DJ 24/7` : "Auto DJ 24/7"));
             }
             // Listener view: don't reveal AutoDJ track titles
             if (state.source === "autodj" && !showInternalSource) {
