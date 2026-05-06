@@ -11,6 +11,8 @@ interface RadioPlayerProps {
   theme?: "dark" | "light";
   minimal?: boolean;
   autoplay?: boolean;
+  /** Compact 40px-tall bar — used for fixed bottom players. */
+  compact?: boolean;
   /**
    * When true, exposes internal sources (AutoDJ vs program, drift, track titles).
    * The owner dashboard sets this to true. Public listeners always see "À l'antenne".
@@ -20,7 +22,7 @@ interface RadioPlayerProps {
 
 export function RadioPlayer({
   slug, radioName, theme = "dark", minimal = false, autoplay = false,
-  showInternalSource = false,
+  compact = false, showInternalSource = false,
 }: RadioPlayerProps) {
   const { state, start, stop, userStarted, fadeMs, setFadeMs } = useRadioEngine(slug);
   const [autoTried, setAutoTried] = useState(false);
