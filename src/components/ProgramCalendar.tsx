@@ -29,6 +29,27 @@ export function ProgramCalendar({ programs, conflictIds, onEdit, onDelete, onCre
     return h * 60 + (m || 0);
   };
 
+  // Compute "Auto DJ" gap blocks per day = inverse of all programmed intervals.
+  // The engine already falls back to Auto DJ on these gaps; here we surface it
+  // visually so the operator sees the radio is always on the air.
+  const autoDjGaps = useMemo(() => {
+    const out: Record<number, Array<{ startMin: number; endMin: number }>> = {};
+    for (let d = 0; d < 7; d++) {
+      const intervals = (grouped[d] ?? [])
+        .map((p) => ({ s: toMin(p.start_time), e: toMin(p.end_time) }))
+        .sort((a, b) => a.s - b.s);
+      const gaps: Array<{ startMin: number; endMin: number }> = [];
+      let cursor = 0;
+      for (const it of intervals) {
+        if (it.s > cursor) gaps.push({ startMin: cursor, endMin: it.s });
+        if (it.e > cursor) cursor = it.e;
+      }
+      if (cursor < 24 * 60) gaps.push({ startMin: cursor, endMin: 24 * 60 });
+      out[d] = gaps;
+    }
+    return out;
+  }, [grouped]);
+
   const typeColor = (t: string) =>
     t === "live"
       ? "bg-[hsl(var(--live-red))]/85 border-[hsl(var(--live-red))] text-white"
@@ -71,6 +92,23 @@ export function ProgramCalendar({ programs, conflictIds, onEdit, onDelete, onCre
                   aria-label={`Créer un programme ${DAY_LABELS[day]} ${h}h`}
                 />
               ))}
+              {/* Auto DJ background blocks — visualize that the radio is always live */}
+              {(autoDjGaps[day] ?? []).map((g, i) => {
+                const top = (g.startMin / 60) * HOUR_PX;
+                const height = ((g.endMin - g.startMin) / 60) * HOUR_PX;
+                if (height < 6) return null;
+                return (
+                  <div
+                    key={`adj-${i}`}
+                    style={{ top, height }}
+                    className="absolute left-1 right-1 rounded-md border border-dashed border-primary/40 bg-[repeating-linear-gradient(135deg,hsl(var(--primary)/0.08)_0_8px,transparent_8px_16px)] pointer-events-none overflow-hidden"
+                  >
+                    <div className="px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+                      Auto DJ
+                    </div>
+                  </div>
+                );
+              })}
               {/* Programs */}
               {(grouped[day] ?? []).map((p) => {
                 const startMin = toMin(p.start_time);
