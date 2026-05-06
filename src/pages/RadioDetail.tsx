@@ -597,6 +597,12 @@ const RadioDetail = () => {
           <BroadcastTargets radioId={radio.id} />
         </DialogContent>
       </Dialog>
+      <RadioBrandingDialog
+        open={brandingOpen}
+        onOpenChange={setBrandingOpen}
+        radio={radio as unknown as { id: string; slug: string; name: string; description: string | null; cover_url?: string | null; avatar_url?: string | null }}
+        onUpdated={(patch) => setRadio((r) => (r ? { ...r, ...patch } as RadioRow : r))}
+      />
     </div>
   );
 };
