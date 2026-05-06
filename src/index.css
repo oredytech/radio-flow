@@ -103,16 +103,19 @@
   .equalizer-bar {
     display: inline-block;
     width: 3px;
+    height: 12px;
     margin-right: 2px;
     background: hsl(var(--neon-cyan));
     border-radius: 2px;
+    transform-origin: center;
     animation: eq 0.9s ease-in-out infinite;
+    will-change: transform;
   }
   .equalizer-bar:nth-child(2) { animation-delay: 0.15s; }
   .equalizer-bar:nth-child(3) { animation-delay: 0.3s; }
   .equalizer-bar:nth-child(4) { animation-delay: 0.45s; }
   @keyframes eq {
-    0%, 100% { height: 6px; }
-    50% { height: 22px; }
+    0%, 100% { transform: scaleY(0.45); }
+    50%      { transform: scaleY(1.6); }
   }
 }
