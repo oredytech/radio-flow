@@ -92,6 +92,23 @@ export function ProgramCalendar({ programs, conflictIds, onEdit, onDelete, onCre
                   aria-label={`Créer un programme ${DAY_LABELS[day]} ${h}h`}
                 />
               ))}
+              {/* Auto DJ background blocks — visualize that the radio is always live */}
+              {(autoDjGaps[day] ?? []).map((g, i) => {
+                const top = (g.startMin / 60) * HOUR_PX;
+                const height = ((g.endMin - g.startMin) / 60) * HOUR_PX;
+                if (height < 6) return null;
+                return (
+                  <div
+                    key={`adj-${i}`}
+                    style={{ top, height }}
+                    className="absolute left-1 right-1 rounded-md border border-dashed border-primary/40 bg-[repeating-linear-gradient(135deg,hsl(var(--primary)/0.08)_0_8px,transparent_8px_16px)] pointer-events-none overflow-hidden"
+                  >
+                    <div className="px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+                      Auto DJ
+                    </div>
+                  </div>
+                );
+              })}
               {/* Programs */}
               {(grouped[day] ?? []).map((p) => {
                 const startMin = toMin(p.start_time);
