@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
   ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, AlertTriangle,
   Share2, ArrowUp, ArrowDown, GripVertical, Link2, Calendar, Library, Settings,
-  Music,
+  Music, ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
 import { ProgramCalendar } from "@/components/ProgramCalendar";
 import { BroadcastTargets } from "@/components/BroadcastTargets";
+import { RadioBrandingDialog } from "@/components/RadioBrandingDialog";
 import { DAY_LABELS, findOverlaps, overlapsExisting } from "@/lib/schedule";
 import { useRadioEngine } from "@/lib/useRadioEngine";
 import { cn } from "@/lib/utils";
