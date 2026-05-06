@@ -290,8 +290,11 @@ const RadioDetail = () => {
             </button>
           </nav>
 
-          {/* Action buttons (links + broadcast) */}
+          {/* Action buttons (links + broadcast + profile) */}
           <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setBrandingOpen(true)} title="Profil & couverture de la station">
+              <ImageIcon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Profil</span>
+            </Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={() => setLinksOpen(true)} title="Liens & intégration">
               <Link2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Liens</span>
             </Button>
