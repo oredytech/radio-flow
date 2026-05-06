@@ -177,6 +177,8 @@ export type Database = {
       }
       radios: {
         Row: {
+          avatar_url: string | null
+          cover_url: string | null
           created_at: string
           description: string | null
           id: string
@@ -185,6 +187,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
+          cover_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -193,6 +197,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
+          cover_url?: string | null
           created_at?: string
           description?: string | null
           id?: string

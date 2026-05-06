@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
   ArrowLeft, Plus, Trash2, Radio as RadioIcon, Copy, Check, AlertTriangle,
   Share2, ArrowUp, ArrowDown, GripVertical, Link2, Calendar, Library, Settings,
-  Music,
+  Music, ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
 import { ProgramCalendar } from "@/components/ProgramCalendar";
 import { BroadcastTargets } from "@/components/BroadcastTargets";
+import { RadioBrandingDialog } from "@/components/RadioBrandingDialog";
 import { DAY_LABELS, findOverlaps, overlapsExisting } from "@/lib/schedule";
 import { useRadioEngine } from "@/lib/useRadioEngine";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ const RadioDetail = () => {
   const [open, setOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [brandingOpen, setBrandingOpen] = useState(false);
   const [view, setView] = useState<View>("schedule");
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -288,8 +290,11 @@ const RadioDetail = () => {
             </button>
           </nav>
 
-          {/* Action buttons (links + broadcast) */}
+          {/* Action buttons (links + broadcast + profile) */}
           <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setBrandingOpen(true)} title="Profil & couverture de la station">
+              <ImageIcon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Profil</span>
+            </Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={() => setLinksOpen(true)} title="Liens & intégration">
               <Link2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Liens</span>
             </Button>
@@ -505,7 +510,7 @@ const RadioDetail = () => {
                   {engine.state.currentTitle || "—"}
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">
-                  Source : {engine.state.source === "autodj" ? "Auto DJ" : engine.state.source === "program" ? (engine.state.active?.title || "Programme") : "Hors antenne"}
+                  Source : {engine.state.source === "autodj" ? "Rotation automatique" : engine.state.source === "program" ? (engine.state.active?.title || "Programme") : "Hors antenne"}
                 </div>
               </div>
             </div>
@@ -522,10 +527,10 @@ const RadioDetail = () => {
         )}
       </main>
 
-      {/* ─── FIXED BOTTOM PLAYER (always visible — RadioDJ style) ── */}
+      {/* ─── FIXED BOTTOM PLAYER (always visible — RadioDJ style, 40px) ── */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto px-3 py-2 sm:px-4">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource minimal={false} />
+        <div className="container mx-auto px-2 py-1 sm:px-3">
+          <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource compact />
         </div>
       </div>
 
@@ -592,6 +597,12 @@ const RadioDetail = () => {
           <BroadcastTargets radioId={radio.id} />
         </DialogContent>
       </Dialog>
+      <RadioBrandingDialog
+        open={brandingOpen}
+        onOpenChange={setBrandingOpen}
+        radio={radio as unknown as { id: string; slug: string; name: string; description: string | null; cover_url?: string | null; avatar_url?: string | null }}
+        onUpdated={(patch) => setRadio((r) => (r ? { ...r, ...patch } as RadioRow : r))}
+      />
     </div>
   );
 };
