@@ -29,6 +29,27 @@ export function ProgramCalendar({ programs, conflictIds, onEdit, onDelete, onCre
     return h * 60 + (m || 0);
   };
 
+  // Compute "Auto DJ" gap blocks per day = inverse of all programmed intervals.
+  // The engine already falls back to Auto DJ on these gaps; here we surface it
+  // visually so the operator sees the radio is always on the air.
+  const autoDjGaps = useMemo(() => {
+    const out: Record<number, Array<{ startMin: number; endMin: number }>> = {};
+    for (let d = 0; d < 7; d++) {
+      const intervals = (grouped[d] ?? [])
+        .map((p) => ({ s: toMin(p.start_time), e: toMin(p.end_time) }))
+        .sort((a, b) => a.s - b.s);
+      const gaps: Array<{ startMin: number; endMin: number }> = [];
+      let cursor = 0;
+      for (const it of intervals) {
+        if (it.s > cursor) gaps.push({ startMin: cursor, endMin: it.s });
+        if (it.e > cursor) cursor = it.e;
+      }
+      if (cursor < 24 * 60) gaps.push({ startMin: cursor, endMin: 24 * 60 });
+      out[d] = gaps;
+    }
+    return out;
+  }, [grouped]);
+
   const typeColor = (t: string) =>
     t === "live"
       ? "bg-[hsl(var(--live-red))]/85 border-[hsl(var(--live-red))] text-white"
