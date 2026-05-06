@@ -69,6 +69,7 @@ const RadioDetail = () => {
   const [open, setOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [brandingOpen, setBrandingOpen] = useState(false);
   const [view, setView] = useState<View>("schedule");
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
