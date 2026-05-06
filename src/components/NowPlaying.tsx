@@ -56,10 +56,11 @@ export function NowPlayingBadge({ active, loading }: { active: NowPlayingItem["a
     return <span className="text-[11px] text-muted-foreground">Chargement…</span>;
   }
   if (!active) {
+    // Aucun programme planifié → l'Auto DJ assure la diffusion 24/7.
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        Hors antenne
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        Auto DJ • En direct
       </span>
     );
   }
