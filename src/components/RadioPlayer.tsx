@@ -50,13 +50,16 @@ export function RadioPlayer({
   return (
     <div
       className={cn(
-        "relative flex h-full w-full items-center gap-3 overflow-hidden rounded-xl border p-3 sm:gap-4 sm:p-4",
+        "relative flex w-full items-center overflow-hidden border",
+        compact
+          ? "h-10 gap-2 rounded-md px-2"
+          : "h-full gap-3 rounded-xl p-3 sm:gap-4 sm:p-4",
         isLight
           ? "bg-white text-zinc-900 border-zinc-200"
           : "bg-gradient-card text-foreground border-border shadow-elevated",
       )}
     >
-      {!isLight && (
+      {!isLight && !compact && (
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
           style={{ background: "radial-gradient(ellipse at 0% 0%, hsl(var(--neon-cyan)/0.15), transparent 50%)" }}
@@ -66,57 +69,70 @@ export function RadioPlayer({
       <button
         onClick={() => (userStarted ? stop() : start())}
         className={cn(
-          "relative z-10 flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95",
+          "relative z-10 flex shrink-0 items-center justify-center rounded-full transition-transform active:scale-95",
+          compact ? "h-7 w-7" : "h-12 w-12 sm:h-14 sm:w-14",
           isLive
-            ? "bg-[hsl(var(--live-red))] text-white shadow-[0_0_30px_hsl(var(--live-red)/0.6)]"
+            ? "bg-[hsl(var(--live-red))] text-white shadow-[0_0_20px_hsl(var(--live-red)/0.6)]"
             : "bg-gradient-brand text-primary-foreground shadow-glow",
         )}
         aria-label={userStarted ? "Stop" : "Play"}
       >
-        {userStarted ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 translate-x-0.5" />}
+        {userStarted
+          ? <Pause className={compact ? "h-3.5 w-3.5" : "h-5 w-5 sm:h-6 sm:w-6"} />
+          : <Play className={cn("translate-x-0.5", compact ? "h-3.5 w-3.5" : "h-5 w-5 sm:h-6 sm:w-6")} />}
       </button>
 
       <div className="relative z-10 min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {isLive && userStarted && (
-            <span className="live-pulse inline-flex items-center gap-1 rounded-full bg-[hsl(var(--live-red))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-              ● En direct
+        {!compact && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {isLive && userStarted && (
+              <span className="live-pulse inline-flex items-center gap-1 rounded-full bg-[hsl(var(--live-red))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                ● En direct
+              </span>
+            )}
+            {!isLive && userStarted && (
+              <span className="inline-flex h-5 items-center gap-1 rounded-full bg-secondary px-2 text-[10px] font-bold uppercase tracking-wider">
+                <span className="inline-flex h-3 w-[14px] items-end overflow-hidden">
+                  <span className="equalizer-bar" />
+                  <span className="equalizer-bar" />
+                  <span className="equalizer-bar" />
+                </span>
+                <span className="ml-0.5">À l'antenne</span>
+              </span>
+            )}
+            {isAutoDj && userStarted && showInternalSource && (
+              <span className="inline-flex h-5 items-center gap-1 rounded-full bg-[hsl(var(--neon-violet))]/20 text-[hsl(var(--neon-violet))] px-2 text-[10px] font-bold uppercase tracking-wider">
+                Auto DJ
+              </span>
+            )}
+            {radioName && !minimal && (
+              <span className="truncate text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                {radioName}
+              </span>
+            )}
+          </div>
+        )}
+        <div className={cn("truncate font-semibold", compact ? "text-xs leading-tight flex items-center gap-2" : "mt-1 text-sm sm:text-base")}>
+          {compact && userStarted && (
+            <span className="inline-flex h-3 w-[14px] shrink-0 items-end overflow-hidden">
+              <span className="equalizer-bar" />
+              <span className="equalizer-bar" />
+              <span className="equalizer-bar" />
             </span>
           )}
-          {!isLive && userStarted && (state.source === "program" || (state.source === "autodj" && !showInternalSource)) && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-              <span className="equalizer-bar" />
-              <span className="equalizer-bar" />
-              <span className="equalizer-bar" />
-              <span className="ml-1">À l'antenne</span>
-            </span>
-          )}
-          {isAutoDj && userStarted && showInternalSource && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--neon-violet))]/20 text-[hsl(var(--neon-violet))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-              <span className="equalizer-bar" />
-              <span className="equalizer-bar" />
-              <span className="ml-1">Auto DJ</span>
-            </span>
-          )}
-          {radioName && !minimal && (
-            <span className="truncate text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {radioName}
-            </span>
-          )}
+          <span className="truncate">
+            {(() => {
+              if (!userStarted) {
+                return state.active?.title || radioName || "À l'antenne";
+              }
+              if (state.source === "autodj" && !showInternalSource) {
+                return radioName || "À l'antenne";
+              }
+              return state.currentTitle || radioName || "Lecture en cours";
+            })()}
+          </span>
         </div>
-        <div className="mt-1 truncate text-sm sm:text-base font-semibold">
-          {(() => {
-            if (!userStarted) {
-              return state.active?.title || (state.active ? "Programme prêt" : (radioName ? `${radioName} · Auto DJ 24/7` : "Auto DJ 24/7"));
-            }
-            // Listener view: don't reveal AutoDJ track titles
-            if (state.source === "autodj" && !showInternalSource) {
-              return radioName || "À l'antenne";
-            }
-            return state.currentTitle || (state.source === "silence" ? "Hors antenne" : "Lecture en cours");
-          })()}
-        </div>
-        {!minimal && (state.active || (isAutoDj && showInternalSource)) && (
+        {!compact && !minimal && (state.active || (isAutoDj && showInternalSource)) && (
           <div className="mt-0.5 truncate text-[11px] sm:text-xs text-muted-foreground">
             {state.active && (
               <>
@@ -135,7 +151,7 @@ export function RadioPlayer({
         )}
       </div>
 
-      {!minimal && (
+      {!compact && !minimal && (
         <div className="relative z-10 hidden sm:flex flex-col items-end text-right gap-1">
           <RadioIcon className="h-5 w-5 text-primary" />
           {state.error && state.error !== "Radio not found" && (
