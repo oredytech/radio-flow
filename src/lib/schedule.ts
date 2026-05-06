@@ -195,19 +195,36 @@ export function computeAutoDj(tracks: Track[], nowMs: number, folders: TrackFold
     .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
   if (music.length === 0) return { track: null, offsetSec: 0, index: 0 };
 
-  const totalLoop = music.reduce((s, t) => s + (t.duration_seconds ?? 0), 0);
+  // Jingles intercalés entre chaque piste Auto DJ.
+  // Source = dossier dont kind = 'jingles'. Si aucun dossier "jingles" ou
+  // aucune piste, on diffuse simplement la rotation musicale sans jingle.
+  const jingleFolder = folders.find((f) => f.kind === "jingles");
+  const jingles = jingleFolder
+    ? tracks
+        .filter((t) => t.folder_id === jingleFolder.id && (t.duration_seconds ?? 0) > 0)
+        .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+    : [];
+
+  // Construit la séquence diffusée : musique, [jingle], musique, [jingle], ...
+  const sequence: Track[] = [];
+  for (let i = 0; i < music.length; i++) {
+    sequence.push(music[i]);
+    if (jingles.length > 0) sequence.push(jingles[i % jingles.length]);
+  }
+
+  const totalLoop = sequence.reduce((s, t) => s + (t.duration_seconds ?? 0), 0);
   if (totalLoop <= 0) return { track: null, offsetSec: 0, index: 0 };
 
   const epochSec = Math.floor(nowMs / 1000) % Math.floor(totalLoop);
   let acc = 0;
-  for (let i = 0; i < music.length; i++) {
-    const dur = music[i].duration_seconds ?? 0;
+  for (let i = 0; i < sequence.length; i++) {
+    const dur = sequence[i].duration_seconds ?? 0;
     if (epochSec < acc + dur) {
-      return { track: music[i], offsetSec: epochSec - acc, index: i };
+      return { track: sequence[i], offsetSec: epochSec - acc, index: i };
     }
     acc += dur;
   }
-  return { track: music[0], offsetSec: 0, index: 0 };
+  return { track: sequence[0], offsetSec: 0, index: 0 };
 }
 
 export const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
