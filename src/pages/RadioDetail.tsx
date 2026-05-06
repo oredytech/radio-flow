@@ -505,7 +505,7 @@ const RadioDetail = () => {
                   {engine.state.currentTitle || "—"}
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">
-                  Source : {engine.state.source === "autodj" ? "Auto DJ" : engine.state.source === "program" ? (engine.state.active?.title || "Programme") : "Hors antenne"}
+                  Source : {engine.state.source === "autodj" ? "Rotation automatique" : engine.state.source === "program" ? (engine.state.active?.title || "Programme") : "Hors antenne"}
                 </div>
               </div>
             </div>
