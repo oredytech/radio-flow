@@ -496,7 +496,7 @@ export function useRadioEngine(slug: string) {
   useEffect(() => {
     if (programs.length === 0 && tracks.length === 0) return;
     const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
     setState((s) => ({ ...s, ...resolved }));
   }, [programs, tracks, folders, programTracks]);
 
