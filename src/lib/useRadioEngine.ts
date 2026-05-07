@@ -268,7 +268,7 @@ export function useRadioEngine(slug: string) {
       const liveAudio = liveRef.current!;
 
       const now = serverNow();
-      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
       const { active, offsetSec, autoDj, scheduledAudio } = resolved;
 
       let driftCorrection = 0;
