@@ -166,11 +166,15 @@ export function useRadioEngine(slug: string) {
     b.crossOrigin = "anonymous";
     b.volume = 0;
     liveRef.current = b;
+    const c = new Audio();
+    c.preload = "auto";
+    c.crossOrigin = "anonymous";
+    c.volume = 0;
+    jingleRef.current = c;
     return () => {
-      a.pause();
-      a.src = "";
-      b.pause();
-      b.src = "";
+      a.pause(); a.src = "";
+      b.pause(); b.src = "";
+      c.pause(); c.src = "";
     };
   }, []);
 
