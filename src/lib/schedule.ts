@@ -179,37 +179,65 @@ export function computeProgramAudio(program: Program, offsetSec: number, program
   return null;
 }
 
+export interface JingleSettings {
+  mode: "off" | "after_track" | "after_program" | "overlap";
+  order: "sequential" | "random";
+  every: number; // insert one jingle every N music tracks (>=1)
+}
+
+export const DEFAULT_JINGLE_SETTINGS: JingleSettings = {
+  mode: "after_track",
+  order: "sequential",
+  every: 1,
+};
+
 /**
- * Deterministic Auto DJ: tracks from the AutoDJ-source folder ordered by
- * `position`, looped end-to-end. The position in the global rotation is
- * derived from server time so that every listener hears the exact same
- * track at the same offset.
+ * Deterministic Auto DJ. Tracks from the AutoDJ-source folder ordered by
+ * `position`, looped. Position = derived from server time so all listeners
+ * stay in sync. Jingles are interleaved according to `settings`.
+ *
+ * - `off` / `overlap`  → no jingle inside the main rotation (overlap is
+ *   handled by a separate audio channel in the engine).
+ * - `after_track`      → 1 jingle every `every` music tracks.
+ * - `after_program`    → no jingle inside Auto DJ, the engine plays one
+ *   when a program slot ends (handled outside of this function).
  */
-export function computeAutoDj(tracks: Track[], nowMs: number, folders: TrackFolder[] = []) {
+export function computeAutoDj(
+  tracks: Track[], nowMs: number, folders: TrackFolder[] = [],
+  settings: JingleSettings = DEFAULT_JINGLE_SETTINGS,
+) {
   const sourceFolder = folders.find((f) => f.is_autodj_source);
   const pool = sourceFolder
     ? tracks.filter((t) => t.folder_id === sourceFolder.id)
-    : tracks; // legacy fallback if no folder configured yet
+    : tracks;
   const music = pool
     .filter((t) => (t.duration_seconds ?? 0) > 0)
     .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
   if (music.length === 0) return { track: null, offsetSec: 0, index: 0 };
 
-  // Jingles intercalés entre chaque piste Auto DJ.
-  // Source = dossier dont kind = 'jingles'. Si aucun dossier "jingles" ou
-  // aucune piste, on diffuse simplement la rotation musicale sans jingle.
   const jingleFolder = folders.find((f) => f.kind === "jingles");
-  const jingles = jingleFolder
+  const allJingles = jingleFolder
     ? tracks
         .filter((t) => t.folder_id === jingleFolder.id && (t.duration_seconds ?? 0) > 0)
         .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
     : [];
 
-  // Construit la séquence diffusée : musique, [jingle], musique, [jingle], ...
+  // Build the deterministic sequence used for the global rotation. We only
+  // intercalate jingles when mode === "after_track". Other modes leave the
+  // music rotation untouched (they're triggered by the engine itself).
   const sequence: Track[] = [];
+  const interleave = settings.mode === "after_track" && allJingles.length > 0;
+  const every = Math.max(1, settings.every | 0);
+
   for (let i = 0; i < music.length; i++) {
     sequence.push(music[i]);
-    if (jingles.length > 0) sequence.push(jingles[i % jingles.length]);
+    if (interleave && (i + 1) % every === 0) {
+      const jIdx = settings.order === "random"
+        // Deterministic pseudo-random based on index → same for all listeners.
+        ? Math.abs((i * 2654435761) >>> 0) % allJingles.length
+        : Math.floor(i / every) % allJingles.length;
+      sequence.push(allJingles[jIdx]);
+    }
   }
 
   const totalLoop = sequence.reduce((s, t) => s + (t.duration_seconds ?? 0), 0);
@@ -226,6 +254,7 @@ export function computeAutoDj(tracks: Track[], nowMs: number, folders: TrackFold
   }
   return { track: sequence[0], offsetSec: 0, index: 0 };
 }
+
 
 export const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 export const DAY_LABELS_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
