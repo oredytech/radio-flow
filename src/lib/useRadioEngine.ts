@@ -201,8 +201,22 @@ export function useRadioEngine(slug: string) {
         setTracks(trks ?? []);
         setFolders(flds ?? []);
         setProgramTracks((pts ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
+        setJingleSettings({
+          mode: ((radio as { jingle_mode?: string }).jingle_mode ?? "after_track") as JingleSettings["mode"],
+          order: ((radio as { jingle_order?: string }).jingle_order ?? "sequential") as JingleSettings["order"],
+          every: (radio as { jingle_every?: number }).jingle_every ?? 1,
+        });
         setState((s) => ({ ...s, isReady: true }));
       }
+      const reloadRadio = async () => {
+        const { data: r2 } = await supabase.from("radios")
+          .select("jingle_mode, jingle_order, jingle_every").eq("id", radio.id).maybeSingle();
+        if (!cancelled && r2) setJingleSettings({
+          mode: ((r2 as { jingle_mode?: string }).jingle_mode ?? "after_track") as JingleSettings["mode"],
+          order: ((r2 as { jingle_order?: string }).jingle_order ?? "sequential") as JingleSettings["order"],
+          every: (r2 as { jingle_every?: number }).jingle_every ?? 1,
+        });
+      };
       const channel = supabase
         .channel(`radio:${radio.id}`)
         .on("postgres_changes",
