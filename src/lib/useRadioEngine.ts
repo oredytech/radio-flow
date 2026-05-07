@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { startTimeSync, serverNow, syncServerTime } from "@/lib/time";
 import {
   resolveActiveProgram,
+  DEFAULT_JINGLE_SETTINGS,
+  type JingleSettings,
   type Program,
   type ProgramTrack,
   type ResolvedState,
