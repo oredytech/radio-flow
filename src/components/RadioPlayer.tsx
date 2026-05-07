@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Radio as RadioIcon } from "lucide-react";
-import { useRadioEngine } from "@/lib/useRadioEngine";
+import { useRadioEngine, type EngineHandle } from "@/lib/useRadioEngine";
 import { secToHHMM, timeToSec } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
@@ -11,20 +11,20 @@ interface RadioPlayerProps {
   theme?: "dark" | "light";
   minimal?: boolean;
   autoplay?: boolean;
-  /** Compact 40px-tall bar — used for fixed bottom players. */
   compact?: boolean;
-  /**
-   * When true, exposes internal sources (AutoDJ vs program, drift, track titles).
-   * The owner dashboard sets this to true. Public listeners always see "À l'antenne".
-   */
   showInternalSource?: boolean;
+  /** When provided, the player reuses this engine instead of creating its own.
+   *  Required to keep audio playing across navigation (one engine per app). */
+  externalEngine?: EngineHandle;
 }
 
 export function RadioPlayer({
   slug, radioName, theme = "dark", minimal = false, autoplay = false,
-  compact = false, showInternalSource = false,
+  compact = false, showInternalSource = false, externalEngine,
 }: RadioPlayerProps) {
-  const { state, start, stop, userStarted, fadeMs, setFadeMs } = useRadioEngine(slug);
+  const ownEngine = useRadioEngine(externalEngine ? "" : slug);
+  const engine = externalEngine ?? ownEngine;
+  const { state, start, stop, userStarted, fadeMs, setFadeMs } = engine;
   const [autoTried, setAutoTried] = useState(false);
 
   useEffect(() => {
