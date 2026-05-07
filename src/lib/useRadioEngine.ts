@@ -446,7 +446,7 @@ export function useRadioEngine(slug: string) {
     } finally {
       tickingRef.current = false;
     }
-  }, [programs, tracks, folders, programTracks, userStarted]);
+  }, [programs, tracks, folders, programTracks, jingleSettings, userStarted]);
 
   // Keep latest tick fn in a ref so the audio "ended" listener can call it.
   useEffect(() => { tickFnRef.current = tick; }, [tick]);
