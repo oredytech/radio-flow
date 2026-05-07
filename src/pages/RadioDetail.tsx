@@ -527,12 +527,7 @@ const RadioDetail = () => {
         )}
       </main>
 
-      {/* ─── FIXED BOTTOM PLAYER (always visible — RadioDJ style, 40px) ── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto px-2 py-1 sm:px-3">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource compact />
-        </div>
-      </div>
+      {/* Global persistent player rendered by <PlayerProvider> */}
 
       {/* ─── LINKS POPUP ─────────────────────────────────────────── */}
       <Dialog open={linksOpen} onOpenChange={setLinksOpen}>
