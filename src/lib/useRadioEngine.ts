@@ -484,3 +484,6 @@ export function useRadioEngine(slug: string) {
 
   return { state, programs, tracks, folders, start, stop, userStarted, fadeMs, setFadeMs };
 }
+
+export type EngineHandle = ReturnType<typeof useRadioEngine>;
+
