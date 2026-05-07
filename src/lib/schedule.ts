@@ -65,6 +65,7 @@ export function resolveActiveProgram(
   tracks: Track[] = [],
   folders: TrackFolder[] = [],
   programTracks: ProgramTrack[] = [],
+  jingleSettings: JingleSettings = DEFAULT_JINGLE_SETTINGS,
 ): ResolvedState {
   const local = new Date(nowMs);
   const localDow = local.getDay();
