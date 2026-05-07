@@ -76,8 +76,13 @@ const RadioDetail = () => {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  // Live engine — drives the fixed bottom player AND highlights the current track in the library.
-  const engine = useRadioEngine(radio?.slug ?? "");
+  // Use the global persistent player engine
+  const { setActive, setOwnerView, state: engineState } = usePlayer();
+  useEffect(() => {
+    if (radio?.slug) { setActive(radio.slug, radio.name); setOwnerView(true); }
+    return () => setOwnerView(false);
+  }, [radio?.slug, radio?.name, setActive, setOwnerView]);
+  const engine = { state: engineState };
 
   const reorderTracks = (from: number, to: number) => {
     setForm((f) => {
