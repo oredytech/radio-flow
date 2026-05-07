@@ -247,7 +247,6 @@ export function useRadioEngine(slug: string) {
               .from("program_tracks").select("*, track:tracks(*)").order("position");
             if (!cancelled) setProgramTracks((pt2 ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
           })
-          })
         .on("postgres_changes",
           { event: "UPDATE", schema: "public", table: "radios", filter: `id=eq.${radio.id}` },
           () => { reloadRadio(); })
