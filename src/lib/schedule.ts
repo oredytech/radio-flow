@@ -112,7 +112,7 @@ export function resolveActiveProgram(
   }
 
   // Auto DJ — uses only the tracks from the folder marked is_autodj_source.
-  const autoDj = computeAutoDj(tracks, nowMs, folders);
+  const autoDj = computeAutoDj(tracks, nowMs, folders, jingleSettings);
   const scheduledAudio = active && (active.type === "playlist" || active.type === "jingle")
     ? computeProgramAudio(active, offsetSec, programTracks)
     : null;
