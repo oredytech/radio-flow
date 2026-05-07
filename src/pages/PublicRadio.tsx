@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { RadioPlayer } from "@/components/RadioPlayer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { usePlayer } from "@/lib/PlayerContext";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   Radio as RadioIcon, ArrowLeft, Share2, Upload, Code2, Copy, Check,
@@ -18,6 +18,7 @@ interface UploadStatus { active: boolean; pct: number; remaining: number; etaSec
 
 const PublicRadio = () => {
   const { slug = "" } = useParams();
+  const { setActive } = usePlayer();
   const [radio, setRadio] = useState<RadioRow | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -32,9 +33,10 @@ const PublicRadio = () => {
       if (cancel) return;
       if (!r) { setNotFound(true); return; }
       setRadio(r as RadioRow);
+      setActive(r.slug, r.name);
     })();
     return () => { cancel = true; };
-  }, [slug]);
+  }, [slug, setActive]);
 
   // SEO
   useEffect(() => {
@@ -254,12 +256,7 @@ const PublicRadio = () => {
         </div>
       </section>
 
-      {/* ─── FIXED 40px PLAYER (always visible) ─────────────── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto px-2 py-1 sm:px-3">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} compact />
-        </div>
-      </div>
+      {/* Global persistent player is rendered by <PlayerProvider> */}
 
       {/* ─── EMBED DIALOG ───────────────────────────────────── */}
       <Dialog open={embedOpen} onOpenChange={setEmbedOpen}>

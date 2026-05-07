@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { startTimeSync, serverNow, syncServerTime } from "@/lib/time";
 import {
   resolveActiveProgram,
+  DEFAULT_JINGLE_SETTINGS,
+  type JingleSettings,
   type Program,
   type ProgramTrack,
   type ResolvedState,
@@ -107,6 +109,7 @@ export function useRadioEngine(slug: string) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [folders, setFolders] = useState<TrackFolder[]>([]);
   const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
+  const [jingleSettings, setJingleSettings] = useState<JingleSettings>(DEFAULT_JINGLE_SETTINGS);
   const [state, setState] = useState<EngineState>({
     active: null,
     offsetSec: 0,
@@ -126,6 +129,12 @@ export function useRadioEngine(slug: string) {
 
   const playlistRef = useRef<HTMLAudioElement | null>(null);
   const liveRef = useRef<HTMLAudioElement | null>(null);
+  /** Parallel jingle channel for "overlap" mode and after-program triggers.
+   *  Plays on top of the main audio without interrupting it. */
+  const jingleRef = useRef<HTMLAudioElement | null>(null);
+  const lastOverlapAtRef = useRef<number>(0);
+  const lastProgramKeyRef = useRef<string | null>(null);
+  const jingleIdxRef = useRef<number>(0);
   const currentKey = useRef<CurrentSourceKey>(null);
   const tickingRef = useRef(false);
   const tickFnRef = useRef<() => Promise<void>>();
@@ -157,11 +166,15 @@ export function useRadioEngine(slug: string) {
     b.crossOrigin = "anonymous";
     b.volume = 0;
     liveRef.current = b;
+    const c = new Audio();
+    c.preload = "auto";
+    c.crossOrigin = "anonymous";
+    c.volume = 0;
+    jingleRef.current = c;
     return () => {
-      a.pause();
-      a.src = "";
-      b.pause();
-      b.src = "";
+      a.pause(); a.src = "";
+      b.pause(); b.src = "";
+      c.pause(); c.src = "";
     };
   }, []);
 
@@ -171,7 +184,8 @@ export function useRadioEngine(slug: string) {
     let cleanupFn: (() => void) | undefined;
     (async () => {
       const { data: radio, error: re } = await supabase
-        .from("radios").select("id").eq("slug", slug).maybeSingle();
+        .from("radios").select("id, jingle_mode, jingle_order, jingle_every")
+        .eq("slug", slug).maybeSingle();
       if (re || !radio) {
         if (!cancelled) setState((s) => ({ ...s, error: "Radio not found" }));
         return;
@@ -187,8 +201,22 @@ export function useRadioEngine(slug: string) {
         setTracks(trks ?? []);
         setFolders(flds ?? []);
         setProgramTracks((pts ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
+        setJingleSettings({
+          mode: ((radio as { jingle_mode?: string }).jingle_mode ?? "after_track") as JingleSettings["mode"],
+          order: ((radio as { jingle_order?: string }).jingle_order ?? "sequential") as JingleSettings["order"],
+          every: (radio as { jingle_every?: number }).jingle_every ?? 1,
+        });
         setState((s) => ({ ...s, isReady: true }));
       }
+      const reloadRadio = async () => {
+        const { data: r2 } = await supabase.from("radios")
+          .select("jingle_mode, jingle_order, jingle_every").eq("id", radio.id).maybeSingle();
+        if (!cancelled && r2) setJingleSettings({
+          mode: ((r2 as { jingle_mode?: string }).jingle_mode ?? "after_track") as JingleSettings["mode"],
+          order: ((r2 as { jingle_order?: string }).jingle_order ?? "sequential") as JingleSettings["order"],
+          every: (r2 as { jingle_every?: number }).jingle_every ?? 1,
+        });
+      };
       const channel = supabase
         .channel(`radio:${radio.id}`)
         .on("postgres_changes",
@@ -219,6 +247,9 @@ export function useRadioEngine(slug: string) {
               .from("program_tracks").select("*, track:tracks(*)").order("position");
             if (!cancelled) setProgramTracks((pt2 ?? []).filter((pt) => pt.track?.radio_id === radio.id) as ProgramTrack[]);
           })
+        .on("postgres_changes",
+          { event: "UPDATE", schema: "public", table: "radios", filter: `id=eq.${radio.id}` },
+          () => { reloadRadio(); })
         .subscribe();
       cleanupFn = () => { supabase.removeChannel(channel); };
     })();
@@ -235,12 +266,67 @@ export function useRadioEngine(slug: string) {
     try {
       const playlistAudio = playlistRef.current!;
       const liveAudio = liveRef.current!;
+      const jingleAudio = jingleRef.current!;
 
       const now = serverNow();
-      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+      const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
       const { active, offsetSec, autoDj, scheduledAudio } = resolved;
 
       let driftCorrection = 0;
+
+      // ---- Jingle triggers (overlap mode + after-program) -----------------
+      // Plays a parallel jingle at full volume on top of the current audio
+      // without interrupting it. We pick the next jingle in the configured
+      // order (sequential / random) and stamp the trigger so we don't repeat.
+      const jingleFolder = folders.find((f) => f.kind === "jingles");
+      const allJingles = jingleFolder
+        ? tracks.filter((t) => t.folder_id === jingleFolder.id && (t.duration_seconds ?? 0) > 0)
+            .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+        : [];
+      const pickJingle = () => {
+        if (allJingles.length === 0) return null;
+        if (jingleSettings.order === "random") {
+          return allJingles[Math.floor(Math.random() * allJingles.length)];
+        }
+        const j = allJingles[jingleIdxRef.current % allJingles.length];
+        jingleIdxRef.current = (jingleIdxRef.current + 1) % allJingles.length;
+        return j;
+      };
+      const playParallelJingle = async () => {
+        const j = pickJingle();
+        if (!j || !jingleAudio.paused) return;
+        try {
+          jingleAudio.src = j.audio_url;
+          jingleAudio.volume = 0;
+          await waitForAudioReady(jingleAudio);
+          jingleAudio.currentTime = 0;
+          await jingleAudio.play();
+          await fade(jingleAudio, 1, Math.min(800, fadeMsRef.current));
+          jingleAudio.onended = () => { jingleAudio.onended = null; };
+        } catch { /* ignore — main audio keeps playing */ }
+      };
+
+      // Overlap: trigger a parallel jingle every ~N tracks while music plays.
+      if (jingleSettings.mode === "overlap" && allJingles.length > 0 && jingleAudio.paused) {
+        // Use the AutoDJ index as the cadence reference — same trigger across listeners.
+        const idx = autoDj?.index ?? -1;
+        if (idx >= 0 && idx % Math.max(1, jingleSettings.every) === 0
+            && lastOverlapAtRef.current !== idx) {
+          lastOverlapAtRef.current = idx;
+          // Fire-and-forget; don't await.
+          playParallelJingle();
+        }
+      }
+
+      // After-program: when the active program just changed (or ended), fire
+      // a single jingle on top of the next audio (which may be Auto DJ).
+      const programKey = active ? `prog:${active.id}` : null;
+      if (jingleSettings.mode === "after_program" && allJingles.length > 0
+          && lastProgramKeyRef.current && lastProgramKeyRef.current !== programKey) {
+        playParallelJingle();
+      }
+      lastProgramKeyRef.current = programKey;
+
 
       // ---- 1. LIVE program -------------------------------------------------
       if (active && active.type === "live") {
@@ -415,7 +501,7 @@ export function useRadioEngine(slug: string) {
     } finally {
       tickingRef.current = false;
     }
-  }, [programs, tracks, folders, programTracks, userStarted]);
+  }, [programs, tracks, folders, programTracks, jingleSettings, userStarted]);
 
   // Keep latest tick fn in a ref so the audio "ended" listener can call it.
   useEffect(() => { tickFnRef.current = tick; }, [tick]);
@@ -465,9 +551,9 @@ export function useRadioEngine(slug: string) {
   useEffect(() => {
     if (programs.length === 0 && tracks.length === 0) return;
     const now = serverNow();
-    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks);
+    const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
     setState((s) => ({ ...s, ...resolved }));
-  }, [programs, tracks, folders, programTracks]);
+  }, [programs, tracks, folders, programTracks, jingleSettings]);
 
   const start = useCallback(async () => {
     await syncServerTime();
@@ -484,3 +570,6 @@ export function useRadioEngine(slug: string) {
 
   return { state, programs, tracks, folders, start, stop, userStarted, fadeMs, setFadeMs };
 }
+
+export type EngineHandle = ReturnType<typeof useRadioEngine>;
+

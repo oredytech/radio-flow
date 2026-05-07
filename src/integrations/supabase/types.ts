@@ -182,6 +182,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          jingle_every: number
+          jingle_mode: string
+          jingle_order: string
           name: string
           slug: string
           user_id: string
@@ -192,6 +195,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          jingle_every?: number
+          jingle_mode?: string
+          jingle_order?: string
           name: string
           slug: string
           user_id: string
@@ -202,6 +208,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          jingle_every?: number
+          jingle_mode?: string
+          jingle_order?: string
           name?: string
           slug?: string
           user_id?: string

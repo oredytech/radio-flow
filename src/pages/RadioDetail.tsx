@@ -13,13 +13,12 @@ import {
   Music, ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { RadioPlayer } from "@/components/RadioPlayer";
 import { LibraryManager } from "@/components/LibraryManager";
 import { ProgramCalendar } from "@/components/ProgramCalendar";
 import { BroadcastTargets } from "@/components/BroadcastTargets";
 import { RadioBrandingDialog } from "@/components/RadioBrandingDialog";
 import { DAY_LABELS, findOverlaps, overlapsExisting } from "@/lib/schedule";
-import { useRadioEngine } from "@/lib/useRadioEngine";
+import { usePlayer } from "@/lib/PlayerContext";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -77,8 +76,13 @@ const RadioDetail = () => {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  // Live engine — drives the fixed bottom player AND highlights the current track in the library.
-  const engine = useRadioEngine(radio?.slug ?? "");
+  // Use the global persistent player engine
+  const { setActive, setOwnerView, state: engineState } = usePlayer();
+  useEffect(() => {
+    if (radio?.slug) { setActive(radio.slug, radio.name); setOwnerView(true); }
+    return () => setOwnerView(false);
+  }, [radio?.slug, radio?.name, setActive, setOwnerView]);
+  const engine = { state: engineState };
 
   const reorderTracks = (from: number, to: number) => {
     setForm((f) => {
@@ -527,12 +531,7 @@ const RadioDetail = () => {
         )}
       </main>
 
-      {/* ─── FIXED BOTTOM PLAYER (always visible — RadioDJ style, 40px) ── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto px-2 py-1 sm:px-3">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} showInternalSource compact />
-        </div>
-      </div>
+      {/* Global persistent player rendered by <PlayerProvider> */}
 
       {/* ─── LINKS POPUP ─────────────────────────────────────────── */}
       <Dialog open={linksOpen} onOpenChange={setLinksOpen}>
