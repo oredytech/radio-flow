@@ -266,12 +266,67 @@ export function useRadioEngine(slug: string) {
     try {
       const playlistAudio = playlistRef.current!;
       const liveAudio = liveRef.current!;
+      const jingleAudio = jingleRef.current!;
 
       const now = serverNow();
       const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
       const { active, offsetSec, autoDj, scheduledAudio } = resolved;
 
       let driftCorrection = 0;
+
+      // ---- Jingle triggers (overlap mode + after-program) -----------------
+      // Plays a parallel jingle at full volume on top of the current audio
+      // without interrupting it. We pick the next jingle in the configured
+      // order (sequential / random) and stamp the trigger so we don't repeat.
+      const jingleFolder = folders.find((f) => f.kind === "jingles");
+      const allJingles = jingleFolder
+        ? tracks.filter((t) => t.folder_id === jingleFolder.id && (t.duration_seconds ?? 0) > 0)
+            .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+        : [];
+      const pickJingle = () => {
+        if (allJingles.length === 0) return null;
+        if (jingleSettings.order === "random") {
+          return allJingles[Math.floor(Math.random() * allJingles.length)];
+        }
+        const j = allJingles[jingleIdxRef.current % allJingles.length];
+        jingleIdxRef.current = (jingleIdxRef.current + 1) % allJingles.length;
+        return j;
+      };
+      const playParallelJingle = async () => {
+        const j = pickJingle();
+        if (!j || !jingleAudio.paused) return;
+        try {
+          jingleAudio.src = j.audio_url;
+          jingleAudio.volume = 0;
+          await waitForAudioReady(jingleAudio);
+          jingleAudio.currentTime = 0;
+          await jingleAudio.play();
+          await fade(jingleAudio, 1, Math.min(800, fadeMsRef.current));
+          jingleAudio.onended = () => { jingleAudio.onended = null; };
+        } catch { /* ignore — main audio keeps playing */ }
+      };
+
+      // Overlap: trigger a parallel jingle every ~N tracks while music plays.
+      if (jingleSettings.mode === "overlap" && allJingles.length > 0 && jingleAudio.paused) {
+        // Use the AutoDJ index as the cadence reference — same trigger across listeners.
+        const idx = autoDj?.index ?? -1;
+        if (idx >= 0 && idx % Math.max(1, jingleSettings.every) === 0
+            && lastOverlapAtRef.current !== idx) {
+          lastOverlapAtRef.current = idx;
+          // Fire-and-forget; don't await.
+          playParallelJingle();
+        }
+      }
+
+      // After-program: when the active program just changed (or ended), fire
+      // a single jingle on top of the next audio (which may be Auto DJ).
+      const programKey = active ? `prog:${active.id}` : null;
+      if (jingleSettings.mode === "after_program" && allJingles.length > 0
+          && lastProgramKeyRef.current && lastProgramKeyRef.current !== programKey) {
+        playParallelJingle();
+      }
+      lastProgramKeyRef.current = programKey;
+
 
       // ---- 1. LIVE program -------------------------------------------------
       if (active && active.type === "live") {
