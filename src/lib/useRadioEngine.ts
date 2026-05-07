@@ -109,6 +109,7 @@ export function useRadioEngine(slug: string) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [folders, setFolders] = useState<TrackFolder[]>([]);
   const [programTracks, setProgramTracks] = useState<ProgramTrack[]>([]);
+  const [jingleSettings, setJingleSettings] = useState<JingleSettings>(DEFAULT_JINGLE_SETTINGS);
   const [state, setState] = useState<EngineState>({
     active: null,
     offsetSec: 0,
@@ -128,6 +129,12 @@ export function useRadioEngine(slug: string) {
 
   const playlistRef = useRef<HTMLAudioElement | null>(null);
   const liveRef = useRef<HTMLAudioElement | null>(null);
+  /** Parallel jingle channel for "overlap" mode and after-program triggers.
+   *  Plays on top of the main audio without interrupting it. */
+  const jingleRef = useRef<HTMLAudioElement | null>(null);
+  const lastOverlapAtRef = useRef<number>(0);
+  const lastProgramKeyRef = useRef<string | null>(null);
+  const jingleIdxRef = useRef<number>(0);
   const currentKey = useRef<CurrentSourceKey>(null);
   const tickingRef = useRef(false);
   const tickFnRef = useRef<() => Promise<void>>();
