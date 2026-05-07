@@ -18,6 +18,7 @@ interface UploadStatus { active: boolean; pct: number; remaining: number; etaSec
 
 const PublicRadio = () => {
   const { slug = "" } = useParams();
+  const { setActive } = usePlayer();
   const [radio, setRadio] = useState<RadioRow | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -32,9 +33,10 @@ const PublicRadio = () => {
       if (cancel) return;
       if (!r) { setNotFound(true); return; }
       setRadio(r as RadioRow);
+      setActive(r.slug, r.name);
     })();
     return () => { cancel = true; };
-  }, [slug]);
+  }, [slug, setActive]);
 
   // SEO
   useEffect(() => {
