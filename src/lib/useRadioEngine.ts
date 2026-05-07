@@ -184,7 +184,8 @@ export function useRadioEngine(slug: string) {
     let cleanupFn: (() => void) | undefined;
     (async () => {
       const { data: radio, error: re } = await supabase
-        .from("radios").select("id").eq("slug", slug).maybeSingle();
+        .from("radios").select("id, jingle_mode, jingle_order, jingle_every")
+        .eq("slug", slug).maybeSingle();
       if (re || !radio) {
         if (!cancelled) setState((s) => ({ ...s, error: "Radio not found" }));
         return;
