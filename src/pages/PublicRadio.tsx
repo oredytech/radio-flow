@@ -254,12 +254,7 @@ const PublicRadio = () => {
         </div>
       </section>
 
-      {/* ─── FIXED 40px PLAYER (always visible) ─────────────── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto px-2 py-1 sm:px-3">
-          <RadioPlayer slug={radio.slug} radioName={radio.name} compact />
-        </div>
-      </div>
+      {/* Global persistent player is rendered by <PlayerProvider> */}
 
       {/* ─── EMBED DIALOG ───────────────────────────────────── */}
       <Dialog open={embedOpen} onOpenChange={setEmbedOpen}>
