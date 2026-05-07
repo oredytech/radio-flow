@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { RadioPlayer } from "@/components/RadioPlayer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { usePlayer } from "@/lib/PlayerContext";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   Radio as RadioIcon, ArrowLeft, Share2, Upload, Code2, Copy, Check,
