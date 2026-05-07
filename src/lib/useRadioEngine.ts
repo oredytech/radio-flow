@@ -498,7 +498,7 @@ export function useRadioEngine(slug: string) {
     const now = serverNow();
     const resolved = resolveActiveProgram(programs, now, tracks, folders, programTracks, jingleSettings);
     setState((s) => ({ ...s, ...resolved }));
-  }, [programs, tracks, folders, programTracks]);
+  }, [programs, tracks, folders, programTracks, jingleSettings]);
 
   const start = useCallback(async () => {
     await syncServerTime();
